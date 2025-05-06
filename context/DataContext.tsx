@@ -149,21 +149,36 @@ export function DataProvider({ children }: DataProviderProps) {
   };
   
   // Move resetToMockData inside DataProvider to access state setters
-  const resetToMockData = async () => {
-    try {
-      await AsyncStorage.setItem('@rentalEquipment', JSON.stringify(mockRentalEquipment));
-      await AsyncStorage.setItem('@marketplaceItems', JSON.stringify(mockMarketplaceItems));
-      await AsyncStorage.setItem('@bookings', JSON.stringify([]));
-      
-      setRentalEquipment(mockRentalEquipment);
-      setMarketplaceItems(mockMarketplaceItems);
-      setBookings([]);
-      
-      console.log('Data reset to mock data successfully');
-    } catch (error) {
-      console.error('Error resetting data:', error);
-    }
-  };
+ // In DataContext.tsx - Focus on the resetToMockData function
+
+const resetToMockData = async () => {
+  console.log('resetToMockData called');
+  console.log('Current mock data:', JSON.stringify(mockRentalEquipment));
+  
+  try {
+    // Clear existing data
+    console.log('Clearing AsyncStorage data...');
+    await AsyncStorage.removeItem('@rentalEquipment');
+    await AsyncStorage.removeItem('@marketplaceItems');
+    await AsyncStorage.removeItem('@bookings');
+    
+    console.log('Setting new data to AsyncStorage...');
+    // Set new data
+    await AsyncStorage.setItem('@rentalEquipment', JSON.stringify(mockRentalEquipment));
+    await AsyncStorage.setItem('@marketplaceItems', JSON.stringify(mockMarketplaceItems));
+    await AsyncStorage.setItem('@bookings', JSON.stringify([]));
+    
+    console.log('Updating state with new data...');
+    // Update state
+    setRentalEquipment([...mockRentalEquipment]);
+    setMarketplaceItems([...mockMarketplaceItems]);
+    setBookings([]);
+    
+    console.log('Data reset successfully. New rental equipment:', JSON.stringify(mockRentalEquipment));
+  } catch (error) {
+    console.error('Error resetting data:', error);
+  }
+};
 
   return (
     <DataContext.Provider 

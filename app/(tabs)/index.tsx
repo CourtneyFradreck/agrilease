@@ -5,6 +5,8 @@ import { Filter, Search, RefreshCw } from 'lucide-react-native';
 import { useData } from '@/context/DataContext';
 import { EquipmentCard } from '@/components/EquipmentCard';
 import { FilterModal } from '@/components/FilterModal';
+// Import the debug tools component
+import { DebugTools } from '@/components/DebugTools'; // Make sure to create this file in your components folder
 
 export default function Dashboard() {
   const router = useRouter();
@@ -13,6 +15,8 @@ export default function Dashboard() {
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [filteredEquipment, setFilteredEquipment] = useState(rentalEquipment);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  // Add state for showing debug tools
+  const [showDebugTools, setShowDebugTools] = useState(false);
   
   // Equipment categories for filter buttons
   const categories = [
@@ -60,6 +64,7 @@ export default function Dashboard() {
         { 
           text: "Reset", 
           onPress: () => {
+            console.log("Calling resetToMockData...");
             resetToMockData();
             Alert.alert("Success", "Data has been reset to defaults");
           },
@@ -67,6 +72,11 @@ export default function Dashboard() {
         }
       ]
     );
+  };
+
+  // Add long press handler to show debug tools
+  const handleLongPressHeader = () => {
+    setShowDebugTools(!showDebugTools);
   };
 
   const renderCategoryButton = (category: string) => {
@@ -108,7 +118,12 @@ export default function Dashboard() {
         </TouchableOpacity>
       </View>
       
-      <View style={styles.headerContainer}>
+      <TouchableOpacity 
+        style={styles.headerContainer}
+        onPress={() => {}}
+        onLongPress={handleLongPressHeader}
+        activeOpacity={1}
+      >
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
@@ -126,7 +141,10 @@ export default function Dashboard() {
           <RefreshCw size={16} color="#FFFFFF" />
           <Text style={styles.resetButtonText}>Reset</Text>
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
+
+      {/* Show debug tools when enabled */}
+      {showDebugTools && <DebugTools />}
 
       {filteredEquipment.length > 0 ? (
         <FlatList
