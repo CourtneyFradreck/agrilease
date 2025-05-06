@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, ShoppingBag, CirclePlus as PlusCircle, User } from 'lucide-react-native';
+import { House, ShoppingBag, CirclePlus as PlusCircle, User } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -32,7 +32,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <Home color={color} size={size} />
+            <House color={color} size={size} />
           ),
           headerTitle: 'AgriLease',
         }}

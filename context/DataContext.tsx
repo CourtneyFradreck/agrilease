@@ -91,7 +91,7 @@ export function DataProvider({ children }: DataProviderProps) {
       id: `rental-${Date.now()}`,
       owner: {
         id: '2',
-        name: 'Jane Smith',
+        name: 'Courtney Fradreck',
       },
       rating: 4.8,
       reviewCount: 5,
@@ -114,7 +114,7 @@ export function DataProvider({ children }: DataProviderProps) {
       id: `market-${Date.now()}`,
       seller: {
         id: '2',
-        name: 'Jane Smith',
+        name: 'Tinotenda Mukuhwa',
       },
     };
     
@@ -168,7 +168,7 @@ export function DataProvider({ children }: DataProviderProps) {
 const mockRentalEquipment: RentalEquipment[] = [
   {
     id: '1',
-    name: 'John Deere 5075E Utility Tractor',
+    name: 'Leo 5075E Utility Tractor',
     type: 'Tractors',
     description: 'A reliable utility tractor perfect for small to medium farms. Features 75HP engine, 4WD, and comfortable operator station.',
     rentalPrice: 150,
@@ -176,7 +176,7 @@ const mockRentalEquipment: RentalEquipment[] = [
     image: 'https://images.pexels.com/photos/2933243/pexels-photo-2933243.jpeg',
     owner: {
       id: '2',
-      name: 'Jane Smith',
+      name: 'Leopold Gogode',
     },
     rating: 4.8,
     reviewCount: 12,
@@ -189,10 +189,10 @@ const mockRentalEquipment: RentalEquipment[] = [
     description: 'Efficient combine harvester with excellent grain handling capabilities. Perfect for wheat, corn, and soybean harvesting.',
     rentalPrice: 350,
     location: 'Greenfield, OR',
-    image: 'https://images.pexels.com/photos/6253181/pexels-photo-6253181.jpeg',
+    image: 'https://cdn.ironpla.net/i/17502/767/83e74d21-ba03-4f82-80a9-9bf416f7b533.jpg',
     owner: {
       id: '3',
-      name: 'Robert Johnson',
+      name: 'Tanaka Gombarume',
     },
     rating: 4.6,
     reviewCount: 8,
@@ -205,10 +205,10 @@ const mockRentalEquipment: RentalEquipment[] = [
     description: 'Professional-grade disc mower with 7 blades, ideal for hay cutting and field maintenance. Easy to operate and maintain.',
     rentalPrice: 95,
     location: 'Greenfield, OR',
-    image: 'https://images.pexels.com/photos/12398793/pexels-photo-12398793.jpeg',
+    image: 'https://th.bing.com/th/id/OIP.vCtX24OTvMGivGnXPSNzeQHaEK?rs=1&pid=ImgDetMain',
     owner: {
       id: '2',
-      name: 'Jane Smith',
+      name: 'Tapiwa Mukoyi',
     },
     rating: 4.9,
     reviewCount: 15,
