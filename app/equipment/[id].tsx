@@ -91,7 +91,7 @@ export default function EquipmentDetails() {
           <Text style={styles.sectionTitle}>Owner</Text>
           <View style={styles.ownerContainer}>
             <Image 
-              source={{ uri: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg' }}
+              source={{ uri: 'https://www.courtney.codes/assets/images/courtney.jpg' }}
               style={styles.ownerImage}
             />
             

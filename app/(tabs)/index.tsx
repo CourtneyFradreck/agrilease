@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Filter, Search } from 'lucide-react-native';
+import { Filter, Search, RefreshCw } from 'lucide-react-native';
 import { useData } from '@/context/DataContext';
 import { EquipmentCard } from '@/components/EquipmentCard';
 import { FilterModal } from '@/components/FilterModal';
+// Import the debug tools component
+import { DebugTools } from '@/components/DebugTools'; // Make sure to create this file in your components folder
 
 export default function Dashboard() {
   const router = useRouter();
-  const { rentalEquipment } = useData();
+  const { rentalEquipment, resetToMockData } = useData();
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [filteredEquipment, setFilteredEquipment] = useState(rentalEquipment);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  // Add state for showing debug tools
+  const [showDebugTools, setShowDebugTools] = useState(false);
   
   // Equipment categories for filter buttons
   const categories = [
@@ -46,6 +50,33 @@ export default function Dashboard() {
 
   const handleCategoryPress = (category: string) => {
     setActiveFilter(category === 'All' ? null : category);
+  };
+
+  const handleResetData = () => {
+    Alert.alert(
+      "Reset Data",
+      "Are you sure you want to reset all data to defaults?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        { 
+          text: "Reset", 
+          onPress: () => {
+            console.log("Calling resetToMockData...");
+            resetToMockData();
+            Alert.alert("Success", "Data has been reset to defaults");
+          },
+          style: "destructive"
+        }
+      ]
+    );
+  };
+
+  // Add long press handler to show debug tools
+  const handleLongPressHeader = () => {
+    setShowDebugTools(!showDebugTools);
   };
 
   const renderCategoryButton = (category: string) => {
@@ -87,14 +118,33 @@ export default function Dashboard() {
         </TouchableOpacity>
       </View>
       
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoriesContainer}
-        contentContainerStyle={styles.categoriesContent}
+      <TouchableOpacity 
+        style={styles.headerContainer}
+        onPress={() => {}}
+        onLongPress={handleLongPressHeader}
+        activeOpacity={1}
       >
-        {categories.map(category => renderCategoryButton(category))}
-      </ScrollView>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoriesContainer}
+          contentContainerStyle={styles.categoriesContent}
+        >
+          {categories.map(category => renderCategoryButton(category))}
+        </ScrollView>
+        
+        {/* Reset data button */}
+        <TouchableOpacity 
+          style={styles.resetButton}
+          onPress={handleResetData}
+        >
+          <RefreshCw size={16} color="#FFFFFF" />
+          <Text style={styles.resetButtonText}>Reset</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+
+      {/* Show debug tools when enabled */}
+      {showDebugTools && <DebugTools />}
 
       {filteredEquipment.length > 0 ? (
         <FlatList
@@ -163,8 +213,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  categoriesContainer: {
+  headerContainer: {
+    flexDirection: 'row',
     backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: 16,
+  },
+  categoriesContainer: {
+    flex: 1,
     maxHeight: 50,
   },
   categoriesContent: {
@@ -188,6 +245,20 @@ const styles = StyleSheet.create({
   },
   categoryButtonTextActive: {
     color: '#FFFFFF',
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4D7C0F',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  resetButtonText: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter-Medium',
+    fontSize: 12,
+    marginLeft: 4,
   },
   listContent: {
     padding: 16,

@@ -11,6 +11,7 @@ interface DataContextType {
   addRentalEquipment: (equipment: Omit<RentalEquipment, 'id'>) => void;
   addMarketplaceItem: (item: Omit<MarketplaceItem, 'id'>) => void;
   createBooking: (booking: Omit<Booking, 'id' | 'status' | 'createdAt'>) => void;
+  resetToMockData: () => void;
 }
 
 const DataContext = createContext<DataContextType>({
@@ -22,6 +23,7 @@ const DataContext = createContext<DataContextType>({
   addRentalEquipment: () => {},
   addMarketplaceItem: () => {},
   createBooking: () => {},
+  resetToMockData: () => {},
 });
 
 export const useData = () => useContext(DataContext);
@@ -91,7 +93,7 @@ export function DataProvider({ children }: DataProviderProps) {
       id: `rental-${Date.now()}`,
       owner: {
         id: '2',
-        name: 'Jane Smith',
+        name: 'Courtney Fradreck',
       },
       rating: 4.8,
       reviewCount: 5,
@@ -114,7 +116,7 @@ export function DataProvider({ children }: DataProviderProps) {
       id: `market-${Date.now()}`,
       seller: {
         id: '2',
-        name: 'Jane Smith',
+        name: 'Tinotenda Mukuhwa',
       },
     };
     
@@ -146,6 +148,38 @@ export function DataProvider({ children }: DataProviderProps) {
     }
   };
   
+  // Move resetToMockData inside DataProvider to access state setters
+ // In DataContext.tsx - Focus on the resetToMockData function
+
+const resetToMockData = async () => {
+  console.log('resetToMockData called');
+  console.log('Current mock data:', JSON.stringify(mockRentalEquipment));
+  
+  try {
+    // Clear existing data
+    console.log('Clearing AsyncStorage data...');
+    await AsyncStorage.removeItem('@rentalEquipment');
+    await AsyncStorage.removeItem('@marketplaceItems');
+    await AsyncStorage.removeItem('@bookings');
+    
+    console.log('Setting new data to AsyncStorage...');
+    // Set new data
+    await AsyncStorage.setItem('@rentalEquipment', JSON.stringify(mockRentalEquipment));
+    await AsyncStorage.setItem('@marketplaceItems', JSON.stringify(mockMarketplaceItems));
+    await AsyncStorage.setItem('@bookings', JSON.stringify([]));
+    
+    console.log('Updating state with new data...');
+    // Update state
+    setRentalEquipment([...mockRentalEquipment]);
+    setMarketplaceItems([...mockMarketplaceItems]);
+    setBookings([]);
+    
+    console.log('Data reset successfully. New rental equipment:', JSON.stringify(mockRentalEquipment));
+  } catch (error) {
+    console.error('Error resetting data:', error);
+  }
+};
+
   return (
     <DataContext.Provider 
       value={{
@@ -157,6 +191,7 @@ export function DataProvider({ children }: DataProviderProps) {
         addRentalEquipment,
         addMarketplaceItem,
         createBooking,
+        resetToMockData, // Add this new function
       }}
     >
       {children}
@@ -168,15 +203,15 @@ export function DataProvider({ children }: DataProviderProps) {
 const mockRentalEquipment: RentalEquipment[] = [
   {
     id: '1',
-    name: 'John Deere 5075E Utility Tractor',
+    name: 'Leo 5075E Utility Tractor',
     type: 'Tractors',
     description: 'A reliable utility tractor perfect for small to medium farms. Features 75HP engine, 4WD, and comfortable operator station.',
     rentalPrice: 150,
-    location: 'Springfield, IL',
+    location: 'Mutare, MR',
     image: 'https://images.pexels.com/photos/2933243/pexels-photo-2933243.jpeg',
     owner: {
       id: '2',
-      name: 'Jane Smith',
+      name: 'Leopold Gogode',
     },
     rating: 4.8,
     reviewCount: 12,
@@ -188,11 +223,11 @@ const mockRentalEquipment: RentalEquipment[] = [
     type: 'Harvesters',
     description: 'Efficient combine harvester with excellent grain handling capabilities. Perfect for wheat, corn, and soybean harvesting.',
     rentalPrice: 350,
-    location: 'Greenfield, OR',
-    image: 'https://images.pexels.com/photos/6253181/pexels-photo-6253181.jpeg',
+    location: 'Ruva, HR',
+    image: 'https://cdn.ironpla.net/i/17502/767/83e74d21-ba03-4f82-80a9-9bf416f7b533.jpg',
     owner: {
       id: '3',
-      name: 'Robert Johnson',
+      name: 'Tanaka Gombarume',
     },
     rating: 4.6,
     reviewCount: 8,
@@ -204,11 +239,11 @@ const mockRentalEquipment: RentalEquipment[] = [
     type: 'Tillage',
     description: 'Professional-grade disc mower with 7 blades, ideal for hay cutting and field maintenance. Easy to operate and maintain.',
     rentalPrice: 95,
-    location: 'Greenfield, OR',
-    image: 'https://images.pexels.com/photos/12398793/pexels-photo-12398793.jpeg',
+    location: 'Marondera, HR',
+    image: 'https://th.bing.com/th/id/OIP.vCtX24OTvMGivGnXPSNzeQHaEK?rs=1&pid=ImgDetMain',
     owner: {
       id: '2',
-      name: 'Jane Smith',
+      name: 'Tapiwa Mukoyi',
     },
     rating: 4.9,
     reviewCount: 15,
