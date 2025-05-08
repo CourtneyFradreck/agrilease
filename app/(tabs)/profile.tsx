@@ -45,7 +45,7 @@ export default function Profile() {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <Image
-            source={{ uri: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg' }}
+            source={require('@/assets/images/profile.png')}
             style={styles.profileImage}
           />
           
