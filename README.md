@@ -65,36 +65,85 @@ These features are currently under development or planned:
 
 Clone the project:
 
+1. Clone the repository:
+
 ```bash
 git clone https://github.com/CourtneyFradreck/agrilease
 cd agrilease
-npm install
-npx expo start
-
 ```
-Then scan the QR code in Expo Go or run it in an emulator.
+
+2. 📦 Install Dependencies
+
+Before running the app, make sure all dependencies are installed:
+
+```bash
+npm install
+```
+
+---
+
+3. 🔧 Start the Development Server
+
+To run the app on your local machine using Expo:
+
+```bash
+npx expo start
+```
+
+Then:
+
+- Open the **Expo Go** app on your physical device.
+- Scan the QR code shown in your terminal or browser.
+- The app will load automatically.
 
 ## 📦 Building the App for Testing
 
-To create a local APK for Android testing without Play Store:
+If you want to test the app on your phone without publishing it to the Play Store:
+
+1. Make sure you have EAS CLI installed:
+
+```bash
+npm install -g eas-cli
+```
+
+2. Log in to your Expo account (if not already):
+
+```bash
+eas login
+```
+
+3. Build a preview APK:
 
 ```bash
 eas build -p android --profile preview
-````
+```
 
-Download the `.apk` from the EAS dashboard and install it on your device.
+After the build completes, download the `.apk` from your Expo account and install it manually on your Android device.
+
+> No need to run `npx expo start` when testing a built APK — it runs independently.
+
+---
 
 ## 📸 Screens
 
-A screen recording demo is available showing the prototype in use. You can convert this to a GIF or take screenshots and include them below:
-
-```pgsql
-[ Insert screen captures or link to demo video ]
+```
+coming soon
 ```
 
 ## 🤝 Contributing
 
 **AgriLease** is an open project—contributions are welcome! Whether you're a farmer, developer, or designer, you can help make AgriLease better. Submit a pull request or open an issue to get started.
+
+### Steps to Contribute:
+
+1. **Fork** this repo.
+2. **Create** a new branch:  
+   `git checkout -b feature/your-feature-name`
+3. **Commit** your changes:  
+   `git commit -m "Added new feature"`
+4. **Push** your branch:  
+   `git push origin feature/your-feature-name`
+5. **Open** a Pull Request on GitHub.
 
 ## 📄 License
 
@@ -104,9 +153,6 @@ This project is licensed under the **MIT License**. See `LICENSE` for details.
 
 Developed with 💚 by **Courtney Fradreck**
 
-* **Portfolio**: [courtney.codes](https://courtney.codes)
-* **Blog**: [courtnotes.netlify.app](https://courtnotes.netlify.app)
-* **GitHub**: [@my-github](https://github.com/CourtneyFradreck)
-
-
-
+- 🌍 **Portfolio**: [courtney.codes](https://courtney.codes)
+- ✍️ **Blog**: [courtnotes.netlify.app](https://courtnotes.netlify.app)
+- 🐙 **GitHub**: [@my-github](https://github.com/CourtneyFradreck)
