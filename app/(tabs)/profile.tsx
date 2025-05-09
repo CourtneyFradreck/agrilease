@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
-import { Settings, LogOut, MessageCircle, MapPin, Star, FileText, Clock } from 'lucide-react-native';
+import { MaterialIcons, Ionicons, FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Button } from '@/components/Button';
 
@@ -52,12 +52,12 @@ export default function Profile() {
           <Text style={styles.name}>{currentUser.name}</Text>
           
           <View style={styles.locationContainer}>
-            <MapPin size={16} color="#6B7280" />
+            <MaterialIcons name="location-on" size={16} color="#6B7280" />
             <Text style={styles.locationText}>{currentUser.location || 'Location not set'}</Text>
           </View>
           
           <View style={styles.ratingContainer}>
-            <Star size={16} color="#F59E0B" style={styles.starIcon} />
+            <FontAwesome name="star" size={16} color="#F59E0B" style={styles.starIcon} />
             <Text style={styles.ratingText}>4.8</Text>
             <Text style={styles.ratingCount}>(12 reviews)</Text>
           </View>
@@ -71,17 +71,17 @@ export default function Profile() {
         
         <View style={styles.actionsContainer}>
           <TouchableOpacity style={styles.actionButton}>
-            <MessageCircle size={20} color="#4D7C0F" />
+            <MaterialIcons name="message" size={20} color="#4D7C0F" />
             <Text style={styles.actionText}>Message</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/profile/settings')}>
-            <Settings size={20} color="#4D7C0F" />
+            <Ionicons name="settings" size={20} color="#4D7C0F" />
             <Text style={styles.actionText}>Settings</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
-            <LogOut size={20} color="#4D7C0F" />
+            <MaterialIcons name="logout" size={20} color="#4D7C0F" />
             <Text style={styles.actionText}>Logout</Text>
           </TouchableOpacity>
         </View>
@@ -125,7 +125,7 @@ export default function Profile() {
             <Text>Rentals list will appear here</Text>
           ) : (
             <View style={styles.emptyStateContainer}>
-              <Clock size={40} color="#9CA3AF" />
+              <MaterialIcons name="access-time" size={40} color="#9CA3AF" />
               <Text style={styles.emptyStateTitle}>No rental history</Text>
               <Text style={styles.emptyStateText}>
                 You haven't rented any equipment yet
@@ -142,7 +142,7 @@ export default function Profile() {
             <Text>Listings will appear here</Text>
           ) : (
             <View style={styles.emptyStateContainer}>
-              <FileText size={40} color="#9CA3AF" />
+              <MaterialIcons name="description" size={40} color="#9CA3AF" />
               <Text style={styles.emptyStateTitle}>No listings yet</Text>
               <Text style={styles.emptyStateText}>
                 You haven't listed any equipment for rent or sale

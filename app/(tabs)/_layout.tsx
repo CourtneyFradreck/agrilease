@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { House, ShoppingBag, CirclePlus as PlusCircle, User } from 'lucide-react-native';
+import { Entypo, FontAwesome, AntDesign, Feather } from '@expo/vector-icons';
 
 export default function TabLayout() {
   return (
@@ -32,7 +32,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <House color={color} size={size} />
+            <Entypo name="home" color={color} size={size} />
           ),
           headerTitle: 'AgriLease',
         }}
@@ -42,7 +42,7 @@ export default function TabLayout() {
         options={{
           title: 'Marketplace',
           tabBarIcon: ({ color, size }) => (
-            <ShoppingBag color={color} size={size} />
+            <FontAwesome name="shopping-bag" color={color} size={size} />
           ),
           headerTitle: 'Used Equipment',
         }}
@@ -52,7 +52,7 @@ export default function TabLayout() {
         options={{
           title: 'Add Listing',
           tabBarIcon: ({ color, size }) => (
-            <PlusCircle color={color} size={size} />
+            <AntDesign name="pluscircle" color={color} size={size} />
           ),
           headerTitle: 'Add New Listing',
         }}
@@ -62,7 +62,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size }) => (
-            <User color={color} size={size} />
+            <Feather name="user" color={color} size={size} />
           ),
           headerTitle: 'My Profile',
         }}

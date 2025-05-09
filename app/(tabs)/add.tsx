@@ -11,7 +11,7 @@ import {
   Switch,
   Alert,
 } from 'react-native';
-import { Camera } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useData } from '@/context/DataContext';
 import { Button } from '@/components/Button';
@@ -139,7 +139,7 @@ export default function AddListing() {
           
           <View style={styles.photoUploadContainer}>
             <TouchableOpacity style={styles.photoUploadButton}>
-              <Camera size={40} color="#6B7280" />
+              <Feather name="camera" size={40} color="#6B7280" />
               <Text style={styles.photoUploadText}>Add Photos</Text>
             </TouchableOpacity>
           </View>
