@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { RentalEquipment } from '@/types/equipment';
-import { MapPin, Star } from 'lucide-react-native';
+import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
 
 interface EquipmentCardProps {
   equipment: RentalEquipment;
@@ -25,7 +25,7 @@ export function EquipmentCard({ equipment, onPress }: EquipmentCardProps) {
         <Text style={styles.name}>{equipment.name}</Text>
         
         <View style={styles.locationContainer}>
-          <MapPin size={14} color="#6B7280" />
+          <MaterialIcons name="location-on" size={14} color="#6B7280" />
           <Text style={styles.locationText}>{equipment.location}</Text>
           
           {equipment.distance && (
@@ -34,7 +34,7 @@ export function EquipmentCard({ equipment, onPress }: EquipmentCardProps) {
         </View>
         
         <View style={styles.ratingContainer}>
-          <Star size={14} color="#F59E0B" />
+          <FontAwesome name="star" size={14} color="#F59E0B" />
           <Text style={styles.ratingText}>
             {equipment.rating || '4.8'} ({equipment.reviewCount || '12'})
           </Text>

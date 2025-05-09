@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput } from 'react-native';
 import { useData } from '@/context/DataContext';
 import { MarketplaceItem } from '@/components/MarketplaceItem';
-import { Search } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 
 export default function Marketplace() {
   const { marketplaceItems } = useData();
@@ -19,7 +19,7 @@ export default function Marketplace() {
     <View style={styles.container}>
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
-          <Search size={20} color="#6B7280" style={styles.searchIcon} />
+          <Feather name="search" size={20} color="#6B7280" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search marketplace..."

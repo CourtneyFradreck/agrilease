@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { MapPin, PenTool as Tool, User, Calendar, Clock, ArrowRight } from 'lucide-react-native';
+import { MaterialIcons, MaterialCommunityIcons, FontAwesome, Feather } from '@expo/vector-icons';
 import { useData } from '@/context/DataContext';
 import { Button } from '@/components/Button';
 
@@ -51,12 +51,12 @@ export default function EquipmentDetails() {
         
         <View style={styles.infoRow}>
           <View style={styles.infoItem}>
-            <Tool size={20} color="#6B7280" />
+            <MaterialCommunityIcons name="tools" size={20} color="#6B7280" />
             <Text style={styles.infoText}>{equipment.type}</Text>
           </View>
           
           <View style={styles.infoItem}>
-            <MapPin size={20} color="#6B7280" />
+            <MaterialIcons name="location-on" size={20} color="#6B7280" />
             <Text style={styles.infoText}>{equipment.location}</Text>
           </View>
         </View>
@@ -76,12 +76,12 @@ export default function EquipmentDetails() {
           <Text style={styles.sectionTitle}>Availability</Text>
           <View style={styles.availabilityContainer}>
             <View style={styles.availabilityItem}>
-              <Calendar size={18} color="#4D7C0F" />
+              <FontAwesome name="calendar" size={18} color="#4D7C0F" />
               <Text style={styles.availabilityText}>Available Now</Text>
             </View>
             
             <View style={styles.availabilityItem}>
-              <Clock size={18} color="#4D7C0F" />
+              <MaterialIcons name="access-time" size={18} color="#4D7C0F" />
               <Text style={styles.availabilityText}>Minimum 1 day rental</Text>
             </View>
           </View>
@@ -121,7 +121,7 @@ export default function EquipmentDetails() {
         <Button 
           onPress={handleBookingRequest}
           text="Request Booking"
-          icon={<ArrowRight size={20} color="#FFFFFF" />}
+          icon={<Feather name="arrow-right" size={20} color="#FFFFFF" />}
           style={styles.bookButton}
         />
       </View>
