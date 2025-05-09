@@ -8,7 +8,7 @@ import {
   TouchableWithoutFeedback,
   ScrollView
 } from 'react-native';
-import { X } from 'lucide-react-native';
+import { AntDesign } from '@expo/vector-icons';
 import { Button } from './Button';
 
 interface FilterModalProps {
@@ -72,7 +72,7 @@ export function FilterModal({ visible, onClose }: FilterModalProps) {
               <View style={styles.header}>
                 <Text style={styles.title}>Filter Equipment</Text>
                 <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                  <X size={24} color="#6B7280" />
+                  <AntDesign name="close" size={24} color="#6B7280" />
                 </TouchableOpacity>
               </View>
               
