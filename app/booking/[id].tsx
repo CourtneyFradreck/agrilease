@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Check, Calendar as CalendarIcon } from 'lucide-react-native';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { useData } from '@/context/DataContext';
 import { Button } from '@/components/Button';
 import dayjs from 'dayjs';
@@ -87,7 +87,7 @@ export default function BookingRequest() {
       
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <CalendarIcon size={20} color="#4D7C0F" />
+          <MaterialIcons name="calendar-today" size={20} color="#4D7C0F" />
           <Text style={styles.sectionTitle}>Select Rental Dates</Text>
         </View>
         
@@ -160,17 +160,17 @@ export default function BookingRequest() {
       
       <View style={styles.policySection}>
         <View style={styles.policyItem}>
-          <Check size={20} color="#4D7C0F" />
+          <Feather name="check" size={20} color="#4D7C0F" />
           <Text style={styles.policyText}>Free cancellation up to 48 hours before pickup</Text>
         </View>
         
         <View style={styles.policyItem}>
-          <Check size={20} color="#4D7C0F" />
+          <Feather name="check" size={20} color="#4D7C0F" />
           <Text style={styles.policyText}>Equipment insurance included</Text>
         </View>
         
         <View style={styles.policyItem}>
-          <Check size={20} color="#4D7C0F" />
+          <Feather name="check" size={20} color="#4D7C0F" />
           <Text style={styles.policyText}>Pay on pickup or through the app</Text>
         </View>
       </View>

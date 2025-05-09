@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Filter, Search, RefreshCw } from 'lucide-react-native';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useData } from '@/context/DataContext';
 import { EquipmentCard } from '@/components/EquipmentCard';
 import { FilterModal } from '@/components/FilterModal';
@@ -101,7 +101,7 @@ export default function Dashboard() {
     <View style={styles.container}>
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
-          <Search size={20} color="#6B7280" style={styles.searchIcon} />
+          <Feather name="search" size={20} color="#6B7280" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search equipment..."
@@ -114,7 +114,7 @@ export default function Dashboard() {
           style={styles.filterButton}
           onPress={() => setIsFilterModalVisible(true)}
         >
-          <Filter size={20} color="#4D7C0F" />
+          <Feather name="filter" size={20} color="#4D7C0F" />
         </TouchableOpacity>
       </View>
       
@@ -138,7 +138,7 @@ export default function Dashboard() {
           style={styles.resetButton}
           onPress={handleResetData}
         >
-          <RefreshCw size={16} color="#FFFFFF" />
+          <Ionicons name="refresh" size={16} color="#FFFFFF" />
           <Text style={styles.resetButtonText}>Reset</Text>
         </TouchableOpacity>
       </TouchableOpacity>
