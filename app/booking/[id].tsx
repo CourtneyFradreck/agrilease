@@ -7,12 +7,16 @@ import { Button } from '@/components/Button';
 import dayjs from 'dayjs';
 
 // Only import CalendarPicker on native platforms
-let CalendarPicker: any = null;
+let CalendarPicker = null;
 if (Platform.OS !== 'web') {
-  CalendarPicker = require('react-native-calendar-picker').default;
+  try {
+    CalendarPicker = require('react-native-calendar-picker').default;
+  } catch (error) {
+    console.log('Error loading CalendarPicker:', error);
+  }
 }
 
-export default function BookingRequest() {
+const BookingRequest = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { getRentalEquipmentById, createBooking } = useData();
@@ -91,7 +95,7 @@ export default function BookingRequest() {
           <Text style={styles.sectionTitle}>Select Rental Dates</Text>
         </View>
         
-        {Platform.OS !== 'web' && CalendarPicker && (
+        {Platform.OS !== 'web' && CalendarPicker ? (
           <View style={styles.calendarContainer}>
             <CalendarPicker
               startFromMonday={true}
@@ -115,6 +119,12 @@ export default function BookingRequest() {
                 backgroundColor: '#E5F2DC',
               }}
             />
+          </View>
+        ) : (
+          // Fallback for web or when calendar is not available
+          <View style={styles.manualDateContainer}>
+            <Text style={styles.dateInputLabel}>Please select your dates:</Text>
+            {/* You could add manual date input components here if needed */}
           </View>
         )}
         
@@ -245,6 +255,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
   },
+  manualDateContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+  dateInputLabel: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
   datesContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -355,3 +380,5 @@ const styles = StyleSheet.create({
     width: 150,
   },
 });
+
+export default BookingRequest;
