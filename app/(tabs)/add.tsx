@@ -10,11 +10,13 @@ import {
   Platform,
   Switch,
   Alert,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useData } from '@/context/DataContext';
 import { Button } from '@/components/Button';
+import * as ImagePicker from 'expo-image-picker';
 
 type ListingType = 'rental' | 'sale';
 
@@ -28,6 +30,7 @@ export default function AddListing() {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [listingType, setListingType] = useState<ListingType>('rental');
+  const [image, setImage] = useState<string | null>(null);
   
   // For marketplace items only
   const [condition, setCondition] = useState('');
@@ -41,11 +44,74 @@ export default function AddListing() {
   const handleTypeSelection = (selectedType: string) => {
     setType(selectedType);
   };
+
+  // Function to handle image picking from camera
+  const pickImageFromCamera = async () => {
+    // Request camera permissions
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'We need camera permissions to take a photo');
+      return;
+    }
+
+    // Launch camera
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setImage(result.assets[0].uri);
+    }
+  };
+
+  // Function to handle image picking from gallery
+  const pickImageFromGallery = async () => {
+    // Request media library permissions
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'We need media library permissions to select a photo');
+      return;
+    }
+
+    // Launch image library
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setImage(result.assets[0].uri);
+    }
+  };
+
+  // Function to prompt user to choose camera or gallery
+  const handleAddPhoto = () => {
+    Alert.alert(
+      'Add Photo',
+      'Choose an option',
+      [
+        { text: 'Take Photo', onPress: pickImageFromCamera },
+        { text: 'Choose from Gallery', onPress: pickImageFromGallery },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
   
   const handleAddListing = () => {
     // Basic validation
     if (!name || !type || !price || !description || !location) {
       Alert.alert('Missing Information', 'Please fill in all required fields');
+      return;
+    }
+
+    // Check if image is selected
+    if (!image) {
+      Alert.alert('Missing Image', 'Please add at least one photo of your equipment');
       return;
     }
     
@@ -63,8 +129,7 @@ export default function AddListing() {
         rentalPrice: priceValue,
         description,
         location,
-        // Using a random image from Pexels for demo
-        image: 'https://images.pexels.com/photos/2933243/pexels-photo-2933243.jpeg'
+        image: image, // Use the selected image
       });
     } else {
       if (!condition || !year) {
@@ -80,8 +145,7 @@ export default function AddListing() {
         location,
         condition,
         year: parseInt(year),
-        // Using a random image from Pexels for demo
-        image: 'https://images.pexels.com/photos/2933243/pexels-photo-2933243.jpeg'
+        image: image, // Use the selected image
       });
     }
     
@@ -138,10 +202,32 @@ export default function AddListing() {
           </View>
           
           <View style={styles.photoUploadContainer}>
-            <TouchableOpacity style={styles.photoUploadButton}>
-              <Feather name="camera" size={40} color="#6B7280" />
-              <Text style={styles.photoUploadText}>Add Photos</Text>
+            <TouchableOpacity 
+              style={styles.photoUploadButton}
+              onPress={handleAddPhoto}
+            >
+              {image ? (
+                <Image 
+                  source={{ uri: image }} 
+                  style={styles.previewImage} 
+                  resizeMode="cover"
+                />
+              ) : (
+                <>
+                  <Feather name="camera" size={40} color="#6B7280" />
+                  <Text style={styles.photoUploadText}>Add Photos *</Text>
+                </>
+              )}
             </TouchableOpacity>
+            {image && (
+              <TouchableOpacity 
+                style={styles.changePhotoButton}
+                onPress={handleAddPhoto}
+              >
+                <Feather name="edit" size={16} color="#FFFFFF" />
+                <Text style={styles.changePhotoText}>Change Photo</Text>
+              </TouchableOpacity>
+            )}
           </View>
           
           <View style={styles.inputContainer}>
@@ -314,6 +400,7 @@ const styles = StyleSheet.create({
   },
   photoUploadContainer: {
     marginBottom: 20,
+    position: 'relative',
   },
   photoUploadButton: {
     height: 160,
@@ -324,12 +411,34 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   photoUploadText: {
     fontFamily: 'Inter-Medium',
     fontSize: 16,
     color: '#6B7280',
     marginTop: 8,
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  changePhotoButton: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  changePhotoText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    color: '#FFFFFF',
+    marginLeft: 6,
   },
   inputContainer: {
     marginBottom: 20,
