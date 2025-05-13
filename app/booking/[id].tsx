@@ -1,18 +1,187 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Platform, TouchableOpacity, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { useData } from '@/context/DataContext';
 import { Button } from '@/components/Button';
 import dayjs from 'dayjs';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-// Only import CalendarPicker on native platforms
-let CalendarPicker: any = null;
-if (Platform.OS !== 'web') {
-  CalendarPicker = require('react-native-calendar-picker').default;
-}
+// A cross-platform date picker component
+const CrossPlatformDatePicker = ({ label, date, onChange }) => {
+  const [showPicker, setShowPicker] = useState(false);
+  const [tempDate, setTempDate] = useState(date || new Date());
+  
+  // Format date for display
+  const formattedDate = date ? dayjs(date).format('MMM D, YYYY') : 'Select date';
+  
+  // Handle date change from native picker
+  const handleDateChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowPicker(false);
+    }
+    
+    if (selectedDate) {
+      setTempDate(selectedDate);
+      onChange(selectedDate);
+    }
+  };
+  
+  // For web, create a set of month/day/year buttons
+  const WebDateSelector = () => {
+    const today = new Date();
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currentMonth = tempDate ? tempDate.getMonth() : today.getMonth();
+    const currentYear = tempDate ? tempDate.getFullYear() : today.getFullYear();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const years = Array.from({ length: 5 }, (_, i) => currentYear + i);
+    
+    const setMonth = (monthIndex) => {
+      const newDate = new Date(tempDate || today);
+      newDate.setMonth(monthIndex);
+      setTempDate(newDate);
+      onChange(newDate);
+    };
+    
+    const setDay = (day) => {
+      const newDate = new Date(tempDate || today);
+      newDate.setDate(day);
+      setTempDate(newDate);
+      onChange(newDate);
+    };
+    
+    const setYear = (year) => {
+      const newDate = new Date(tempDate || today);
+      newDate.setFullYear(year);
+      setTempDate(newDate);
+      onChange(newDate);
+    };
+    
+    return (
+      <View style={styles.webDatePickerContainer}>
+        <View style={styles.webDatePickerHeader}>
+          <Text style={styles.webDatePickerTitle}>Select a Date</Text>
+          <TouchableOpacity onPress={() => setShowPicker(false)}>
+            <Feather name="x" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.webDatePickerContent}>
+          <View style={styles.pickerColumn}>
+            <Text style={styles.pickerColumnTitle}>Month</Text>
+            <ScrollView style={styles.pickerScrollView} showsVerticalScrollIndicator={false}>
+              {months.map((month, index) => (
+                <TouchableOpacity 
+                  key={month} 
+                  style={[
+                    styles.pickerItem, 
+                    currentMonth === index && styles.pickerItemSelected
+                  ]}
+                  onPress={() => setMonth(index)}
+                >
+                  <Text style={[
+                    styles.pickerItemText,
+                    currentMonth === index && styles.pickerItemTextSelected
+                  ]}>{month}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          
+          <View style={styles.pickerColumn}>
+            <Text style={styles.pickerColumnTitle}>Day</Text>
+            <ScrollView style={styles.pickerScrollView} showsVerticalScrollIndicator={false}>
+              {days.map(day => (
+                <TouchableOpacity 
+                  key={day} 
+                  style={[
+                    styles.pickerItem, 
+                    tempDate && tempDate.getDate() === day && styles.pickerItemSelected
+                  ]}
+                  onPress={() => setDay(day)}
+                >
+                  <Text style={[
+                    styles.pickerItemText,
+                    tempDate && tempDate.getDate() === day && styles.pickerItemTextSelected
+                  ]}>{day}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          
+          <View style={styles.pickerColumn}>
+            <Text style={styles.pickerColumnTitle}>Year</Text>
+            <ScrollView style={styles.pickerScrollView} showsVerticalScrollIndicator={false}>
+              {years.map(year => (
+                <TouchableOpacity 
+                  key={year} 
+                  style={[
+                    styles.pickerItem, 
+                    tempDate && tempDate.getFullYear() === year && styles.pickerItemSelected
+                  ]}
+                  onPress={() => setYear(year)}
+                >
+                  <Text style={[
+                    styles.pickerItemText,
+                    tempDate && tempDate.getFullYear() === year && styles.pickerItemTextSelected
+                  ]}>{year}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+        
+        <View style={styles.webDatePickerFooter}>
+          <Button 
+            onPress={() => setShowPicker(false)} 
+            text="Done" 
+            style={styles.doneButton}
+          />
+        </View>
+      </View>
+    );
+  };
+  
+  return (
+    <View style={styles.datePickerContainer}>
+      <Text style={styles.datePickerLabel}>{label}</Text>
+      
+      <TouchableOpacity 
+        style={styles.datePickerButton} 
+        onPress={() => setShowPicker(true)}
+      >
+        <Text style={styles.datePickerButtonText}>{formattedDate}</Text>
+        <MaterialIcons name="calendar-today" size={20} color="#4D7C0F" />
+      </TouchableOpacity>
+      
+      {showPicker && (
+        Platform.OS === 'web' ? (
+          <Modal
+            visible={showPicker}
+            transparent={true}
+            animationType="fade"
+          >
+            <View style={styles.webModalContainer}>
+              <WebDateSelector />
+            </View>
+          </Modal>
+        ) : (
+          <DateTimePicker
+            value={tempDate || new Date()}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+            minimumDate={new Date()}
+          />
+        )
+      )}
+    </View>
+  );
+};
 
-export default function BookingRequest() {
+const BookingRequest = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { getRentalEquipmentById, createBooking } = useData();
@@ -31,12 +200,21 @@ export default function BookingRequest() {
     );
   }
   
-  const handleDateChange = (date: any, type: string) => {
-    if (type === 'START_DATE') {
-      setStartDate(date?.toDate() || null);
-    } else {
-      setEndDate(date?.toDate() || null);
+  const handleStartDateChange = (date) => {
+    setStartDate(date);
+    // If end date is before start date, adjust it
+    if (endDate && date > endDate) {
+      // Set end date to be same as start date
+      setEndDate(date);
     }
+  };
+  
+  const handleEndDateChange = (date) => {
+    if (startDate && date < startDate) {
+      Alert.alert('Invalid Date', 'End date cannot be earlier than start date');
+      return;
+    }
+    setEndDate(date);
   };
   
   const rentalDays = startDate && endDate 
@@ -91,47 +269,23 @@ export default function BookingRequest() {
           <Text style={styles.sectionTitle}>Select Rental Dates</Text>
         </View>
         
-        {Platform.OS !== 'web' && CalendarPicker && (
-          <View style={styles.calendarContainer}>
-            <CalendarPicker
-              startFromMonday={true}
-              allowRangeSelection={true}
-              minDate={new Date()}
-              todayBackgroundColor="#F0FDF4"
-              selectedDayColor="#4D7C0F"
-              selectedDayTextColor="#FFFFFF"
-              onDateChange={handleDateChange}
-              textStyle={{
-                fontFamily: 'Inter-Regular',
-                color: '#4B5563',
-              }}
-              selectedRangeStartStyle={{
-                backgroundColor: '#4D7C0F',
-              }}
-              selectedRangeEndStyle={{
-                backgroundColor: '#4D7C0F',
-              }}
-              selectedRangeStyle={{
-                backgroundColor: '#E5F2DC',
-              }}
-            />
-          </View>
-        )}
-        
-        <View style={styles.datesContainer}>
-          <View style={styles.dateBox}>
-            <Text style={styles.dateLabel}>Start Date</Text>
-            <Text style={styles.dateValue}>
-              {startDate ? dayjs(startDate).format('MMM D, YYYY') : 'Select date'}
-            </Text>
-          </View>
+        <View style={styles.datePickersContainer}>
+          <CrossPlatformDatePicker
+            label="Start Date"
+            date={startDate}
+            onChange={handleStartDateChange}
+          />
           
-          <View style={styles.dateBox}>
-            <Text style={styles.dateLabel}>End Date</Text>
-            <Text style={styles.dateValue}>
-              {endDate ? dayjs(endDate).format('MMM D, YYYY') : 'Select date'}
-            </Text>
-          </View>
+          <CrossPlatformDatePicker
+            label="End Date"
+            date={endDate}
+            onChange={handleEndDateChange}
+          />
+        </View>
+        
+        <View style={styles.rentalPeriodContainer}>
+          <Text style={styles.rentalPeriodLabel}>Rental Period:</Text>
+          <Text style={styles.rentalPeriodValue}>{rentalDays} days</Text>
         </View>
       </View>
       
@@ -191,7 +345,7 @@ export default function BookingRequest() {
       </View>
     </ScrollView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -240,34 +394,52 @@ const styles = StyleSheet.create({
     color: '#333333',
     marginLeft: 8,
   },
-  calendarContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+  datePickersContainer: {
     marginBottom: 16,
   },
-  datesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  datePickerContainer: {
+    marginBottom: 16,
   },
-  dateBox: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 12,
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-  },
-  dateLabel: {
+  datePickerLabel: {
     fontFamily: 'Inter-Medium',
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  dateValue: {
-    fontFamily: 'Inter-Bold',
+  datePickerButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+  datePickerButtonText: {
+    fontFamily: 'Inter-Regular',
     fontSize: 16,
     color: '#333333',
+  },
+  rentalPeriodContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+  },
+  rentalPeriodLabel: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: '#4D7C0F',
+  },
+  rentalPeriodValue: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    color: '#4D7C0F',
   },
   summaryContainer: {
     backgroundColor: '#F9FAFB',
@@ -354,4 +526,77 @@ const styles = StyleSheet.create({
   goBackButton: {
     width: 150,
   },
+  webModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  webDatePickerContainer: {
+    width: '80%',
+    maxWidth: 400,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  webDatePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  webDatePickerTitle: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    color: '#333333',
+  },
+  webDatePickerContent: {
+    flexDirection: 'row',
+    padding: 16,
+  },
+  webDatePickerFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+    alignItems: 'flex-end',
+  },
+  pickerColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  pickerColumnTitle: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  pickerScrollView: {
+    maxHeight: 200,
+  },
+  pickerItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginVertical: 2,
+    borderRadius: 8,
+  },
+  pickerItemSelected: {
+    backgroundColor: '#E5F2DC',
+  },
+  pickerItemText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: '#4B5563',
+    textAlign: 'center',
+  },
+  pickerItemTextSelected: {
+    fontFamily: 'Inter-Bold',
+    color: '#4D7C0F',
+  },
+  doneButton: {
+    width: 100,
+  },
 });
+
+export default BookingRequest;
