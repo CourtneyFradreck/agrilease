@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "agrilease-app",
-    "slug": "agrilease-app",
+    "name": "agrilease",
+    "slug": "agrilease",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
