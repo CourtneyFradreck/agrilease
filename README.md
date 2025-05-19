@@ -156,3 +156,11 @@ Developed with 💚 by **Courtney Fradreck**
 - 🌍 **Portfolio**: [courtney.codes](https://courtney.codes)
 - ✍️ **Blog**: [courtnotes.netlify.app](https://courtnotes.netlify.app)
 - 🐙 **GitHub**: [@my-github](https://github.com/CourtneyFradreck)
+
+
+# Using Firebase for Auth and Database
+- run npx expo install firebase
+- Collections: users, equipment, leases
+
+# npx expo install @react-native-firebase/app
+- intended to fetch data from the necessary modules and send to the database

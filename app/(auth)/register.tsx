@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingVi
 import { Link, router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/Button';
+import firestore from '@react-native-firebase/firestore';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -12,33 +13,49 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [userType, setUserType] = useState<'farmer' | 'owner'>('farmer');
   const [error, setError] = useState<string | null>(null);
-  
+
+  // Firebase Firestore instance
+ 
+  //const usersCollection = firestore().collection('users');
+  //const userCollection = usersCollection.get();
+  //console.log(userCollection);
+
   const { register } = useAuth();
 
-  const handleRegister = async () => {
-    // Basic validation
-    if (!name || !email || !phone || !password || !confirmPassword) {
-      setError('All fields are required');
-      return;
-    }
-    
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-    
-    try {
-      const success = await register(name, email, phone, password, userType);
-      if (success) {
-        router.replace('/(tabs)');
-      } else {
-        setError('Registration failed. Please try again.');
-      }
-    } catch (err) {
-      setError('An error occurred during registration');
-    }
-  };
+const handleRegister = async () => {
+  // Basic validation
+  if (!name || !email || !phone || !password || !confirmPassword) {
+    setError('All fields are required');
+    return;
+  }
 
+  if (password !== confirmPassword) {
+    setError('Passwords do not match');
+    return;
+  }
+
+  try {
+    const success = await register(name, email, phone, password, userType);
+    if (success) {
+      // Save user data to Firestore
+      await firestore().collection('users').add({
+        name,
+        email,
+        phone,
+        userType,
+        createdAt: firestore.FieldValue.serverTimestamp(), // Optional: track when the user was created
+      });
+
+      // Navigate to the main application
+      router.replace('/(tabs)');
+    } else {
+      setError('Registration failed. Please try again.');
+    }
+  } catch (err) {
+    console.error(err); // Log the error for debugging
+    setError('An error occurred during registration');
+  }
+};
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
