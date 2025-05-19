@@ -12,7 +12,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
         const timer = setTimeout(() => {
             setIsVisible(false);
             onComplete?.();
-        }, 3000); // 6 seconds duration
+        }, 3000); // 3 seconds duration
     
         return () => clearTimeout(timer);
     }, [onComplete]);
@@ -35,18 +35,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#27ae60', // money green
-    },  
-    image: {
+    },    image: {
         width: '90%',
-        height: '80%',
-        resizeMode: 'contain', // Adjust the image size as needed
+        height: '50%', // Reduced height to make room for text
+        resizeMode: 'contain',
+        marginBottom: 20, // Add space between image and text
     },  
     text: {
-        marginTop: 20,
         fontSize: 16,
         color: '#fff',
         textAlign: 'center',
         paddingHorizontal: 20,
-        fontFamily: 'Inter-Regular', // Ensure this font is loaded in your app
+        fontFamily: 'Inter-Bold',
     }
 });
