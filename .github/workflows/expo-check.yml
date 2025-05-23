@@ -12,7 +12,7 @@ jobs:
   expo-check:
     runs-on: ubuntu-latest
 
-    steps: # ✅ This was incorrectly indented in your version
+    steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -32,7 +32,7 @@ jobs:
         run: npx expo install
 
       - name: Validate with expo doctor
-        run: expo doctor
+        run: npx expo-doctor
 
       - name: Check prebuild status
         run: expo prebuild --no-install --platform android
