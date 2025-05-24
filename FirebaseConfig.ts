@@ -1,6 +1,8 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
+import { getFirestore, collection, addDoc, getDocs } from 'firebase/firestore';
+
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -19,3 +21,28 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
+const db = getFirestore(app);
+
+// Test function to verify database connection
+export async function testDatabaseConnection() {
+  try {
+    // Try to add a test document
+    const testCollection = collection(db, 'test');
+    const testDoc = await addDoc(testCollection, {
+      message: 'Test connection',
+      timestamp: new Date()
+    });
+    console.log('Test document written with ID: ', testDoc.id);
+
+    // Try to read from the collection
+    const querySnapshot = await getDocs(testCollection);
+    console.log('Successfully read from database. Documents found:', querySnapshot.size);
+    
+    return true;
+  } catch (error) {
+    console.error('Database connection test failed:', error);
+    return false;
+  }
+}
+
+export { db };
