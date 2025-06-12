@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "410364585643",
+    "project_id": "agrilease-37add",
+    "storage_bucket": "agrilease-37add.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:410364585643:android:eedd44cd3987d77a7879ee",
+        "android_client_info": {
+          "package_name": "com.courtneycodes.agrilease"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDDbntK_pInn7XLkVm9sDseZ0kQPsnT8Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
