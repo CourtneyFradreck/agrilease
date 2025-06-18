@@ -11,6 +11,7 @@ export default function Login() {
   const { login } = useAuth();
 
   const handleLogin = async () => {
+    setError(null); // Clear previous errors
     if (!email || !password) {
       setError('Please enter both email and password');
       return;
@@ -21,10 +22,12 @@ export default function Login() {
       if (success) {
         router.replace('/(tabs)');
       } else {
-        setError('Invalid email or password');
+        // More specific error handling can be done here based on the actual error from login function
+        setError('Invalid email or password. Please check your credentials.');
       }
-    } catch (err) {
-      setError('An error occurred during login');
+    } catch (err: any) { // Catch any unexpected errors
+      console.error("Login component caught error:", err);
+      setError('An unexpected error occurred during login. Please try again.');
     }
   };
 
