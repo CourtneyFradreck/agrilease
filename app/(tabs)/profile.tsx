@@ -49,7 +49,7 @@ export default function Profile() {
             style={styles.profileImage}
           />
           
-          <Text style={styles.name}>{currentUser.name}</Text>
+          <Text style={styles.name}>{currentUser.fullname}</Text>
           
           <View style={styles.locationContainer}>
             <MaterialIcons name="location-on" size={16} color="#6B7280" />
