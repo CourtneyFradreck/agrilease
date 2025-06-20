@@ -31,8 +31,6 @@ if (Platform.OS === 'web') {
     // For web, we use getAuth
     auth = getAuth(app);
 } else {
-    // For React Native, we use initializeAuth with a dynamic require
-    // This is the magic that fixes the "module not found" error
     const { getReactNativePersistence } = require('firebase/auth');
     auth = initializeAuth(app, {
         persistence: getReactNativePersistence(ReactNativeAsyncStorage),
@@ -51,7 +49,7 @@ if (Platform.OS !== 'web') {
     analytics = getAnalytics(app);
 }
 
-// Test function (no changes needed)
+// Test function
 export async function testDatabaseConnection() {
   try {
     const testCollection = collection(db, 'test');
