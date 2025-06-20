@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/Button';
 
 export default function Register() {
-  const [name, setName] = useState('');
+  const [fullname, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -16,8 +16,9 @@ export default function Register() {
   const { register } = useAuth();
 
   const handleRegister = async () => {
+    setError(null); // Clear previous errors
     // Basic validation
-    if (!name || !email || !phone || !password || !confirmPassword) {
+    if (!fullname || !email || !phone || !password || !confirmPassword) {
       setError('All fields are required');
       return;
     }
@@ -28,14 +29,17 @@ export default function Register() {
     }
     
     try {
-      const success = await register(name, email, phone, password, userType);
+      const success = await register(fullname, email, phone, password, userType);
       if (success) {
         router.replace('/(tabs)');
       } else {
-        setError('Registration failed. Please try again.');
+        // Firebase specific error messages are handled within AuthContext, 
+        // but you might want to map common ones here for user-friendliness
+        setError('Registration failed. This email might already be in use or password is too weak.');
       }
-    } catch (err) {
-      setError('An error occurred during registration');
+    } catch (err: any) { // Catch any unexpected errors
+      console.error("Register component caught error:", err);
+      setError('An unexpected error occurred during registration. Please try again.');
     }
   };
 
@@ -55,8 +59,8 @@ export default function Register() {
               style={styles.input}
               placeholder="Enter your full name"
               placeholderTextColor="#A3A3A3"
-              value={name}
-              onChangeText={setName}
+              value={fullname}
+              onChangeText={setFullName}
             />
           </View>
           
@@ -89,7 +93,7 @@ export default function Register() {
             <Text style={styles.label}>Password</Text>
             <TextInput
               style={styles.input}
-              placeholder="Create a password"
+              placeholder="Create a password (min 6 characters)"
               placeholderTextColor="#A3A3A3"
               value={password}
               onChangeText={setPassword}
