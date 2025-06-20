@@ -10,6 +10,7 @@ import { getAnalytics, isSupported } from "firebase/analytics";
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Not sure if these are supposed to be public, but they are needed for Firebase to work
 const firebaseConfig = {
   apiKey: "AIzaSyCENPFsckjW3Jem0e6srw1QQ31fcJ7TW-I",
   authDomain: "agrilease-37add.firebaseapp.com",
