@@ -49,3 +49,6 @@ android/
 # Keystore files
 **/*.keystore
 **/*.jks
+
+# environment files
+.env
