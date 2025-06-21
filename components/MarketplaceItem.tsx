@@ -34,7 +34,7 @@ export function MarketplaceItem({ item }: MarketplaceItemProps) {
   return (
     <TouchableOpacity style={styles.container} onPress={handleShowDetails}>
       <Image 
-        source={{ uri: item.image }} 
+        source={{ uri: item.image || 'https://via.placeholder.com/150?text=No+Image' }} 
         style={styles.image}
         resizeMode="cover"
       />
