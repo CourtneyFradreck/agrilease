@@ -41,7 +41,7 @@ export default function EquipmentDetails() {
   return (
     <ScrollView style={styles.container}>
       <Image 
-        source={{ uri: equipment.image }}
+        source={{ uri: equipment.image || 'https://via.placeholder.com/150?text=No+Image' }}
         style={styles.image}
         resizeMode="cover"
       />
