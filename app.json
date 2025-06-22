@@ -9,7 +9,12 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.courtneycodes.agrileaseapp",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs your location to show nearby equipment and clients.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs your location to show nearby equipment and clients, even when in the background."
+      }
     },
     "web": {
       "bundler": "metro",
@@ -18,7 +23,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow AgriLease to use your location."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -32,7 +43,13 @@
       }
     },
     "android": {
-      "package": "com.courtneycodes.agrileaseapp"
+      "package": "com.courtneycodes.agrileaseapp",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_Maps_API_KEY"
+        }
+      }
     }
   }
 }
