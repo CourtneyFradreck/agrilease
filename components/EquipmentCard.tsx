@@ -12,7 +12,7 @@ export function EquipmentCard({ equipment, onPress }: EquipmentCardProps) {
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
       <Image 
-        source={{ uri: equipment.image }} 
+        source={{ uri: equipment.image  || 'https://via.placeholder.com/150?text=No+Image'}} 
         style={styles.image}
         resizeMode="cover"
       />
