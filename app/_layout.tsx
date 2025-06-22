@@ -3,7 +3,16 @@ import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { useFonts, Inter_400Regular, Inter_500Medium, Inter_700Bold } from '@expo-google-fonts/inter';
+
+// Import Archivo fonts
+import {
+  useFonts,
+  Archivo_400Regular,
+  Archivo_500Medium,
+  Archivo_600SemiBold,
+  Archivo_700Bold,
+} from '@expo-google-fonts/archivo'; // Changed to Archivo import
+
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '@/context/AuthContext';
 import { DataProvider } from '@/context/DataContext';
@@ -19,9 +28,11 @@ export default function RootLayout() {
   useFrameworkReady();
 
   const [fontsLoaded, fontError] = useFonts({
-    'Inter-Regular': Inter_400Regular,
-    'Inter-Medium': Inter_500Medium,
-    'Inter-Bold': Inter_700Bold,
+    // Load Archivo fonts
+    'Archivo-Regular': Archivo_400Regular,
+    'Archivo-Medium': Archivo_500Medium,
+    'Archivo-SemiBold': Archivo_600SemiBold,
+    'Archivo-Bold': Archivo_700Bold,
   });
 
   useEffect(() => {
@@ -49,20 +60,28 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="equipment/[id]" options={{ 
-            headerShown: true, 
-            headerTitle: 'Equipment Details',
-            headerBackTitle: 'Back',
-            headerTintColor: '#4D7C0F',
-            headerStyle: { backgroundColor: '#F5F5F5' },
-          }} />
-          <Stack.Screen name="booking/[id]" options={{ 
-            headerShown: true, 
-            headerTitle: 'Request Booking',
-            headerBackTitle: 'Back',
-            headerTintColor: '#4D7C0F',
-            headerStyle: { backgroundColor: '#F5F5F5' },
-          }} />
+          <Stack.Screen
+            name="equipment/[id]"
+            options={{
+              headerShown: true,
+              headerTitle: 'Equipment Details',
+              headerBackTitle: 'Back',
+              headerTintColor: '#4D7C0F',
+              headerStyle: { backgroundColor: '#F5F5F5' },
+              headerTitleStyle: { fontFamily: 'Archivo-SemiBold' }, // Changed to Archivo-SemiBold
+            }}
+          />
+          <Stack.Screen
+            name="booking/[id]"
+            options={{
+              headerShown: true,
+              headerTitle: 'Request Booking',
+              headerBackTitle: 'Back',
+              headerTintColor: '#4D7C0F',
+              headerStyle: { backgroundColor: '#F5F5F5' },
+              headerTitleStyle: { fontFamily: 'Archivo-SemiBold' }, // Changed to Archivo-SemiBold
+            }}
+          />
           <Stack.Screen name="+not-found" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />
