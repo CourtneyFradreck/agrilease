@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import { MarketplaceItem as MarketplaceItemType } from '@/types/equipment';
-import { MapPin, Phone, MessageCircle } from 'lucide-react-native';
+import { MaterialIcons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 
 interface MarketplaceItemProps {
   item: MarketplaceItemType;
@@ -34,7 +34,7 @@ export function MarketplaceItem({ item }: MarketplaceItemProps) {
   return (
     <TouchableOpacity style={styles.container} onPress={handleShowDetails}>
       <Image 
-        source={{ uri: item.image }} 
+        source={{ uri: item.image || 'https://via.placeholder.com/150?text=No+Image' }} 
         style={styles.image}
         resizeMode="cover"
       />
@@ -57,7 +57,7 @@ export function MarketplaceItem({ item }: MarketplaceItemProps) {
         </View>
         
         <View style={styles.locationContainer}>
-          <MapPin size={14} color="#6B7280" />
+          <MaterialIcons name="location-on" size={14} color="#6B7280" />
           <Text style={styles.locationText}>{item.location}</Text>
         </View>
         
@@ -69,14 +69,14 @@ export function MarketplaceItem({ item }: MarketplaceItemProps) {
               style={styles.contactButton}
               onPress={() => console.log('Call seller')}
             >
-              <Phone size={18} color="#4D7C0F" />
+              <Feather name="phone" size={18} color="#4D7C0F" />
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.contactButton}
               onPress={() => console.log('Message seller')}
             >
-              <MessageCircle size={18} color="#4D7C0F" />
+              <MaterialCommunityIcons name="message-text" size={18} color="#4D7C0F" />
             </TouchableOpacity>
           </View>
         </View>
