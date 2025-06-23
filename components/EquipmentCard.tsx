@@ -3,6 +3,20 @@ import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { RentalEquipment } from '@/types/equipment';
 import { MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 
+const BORDER_RADIUS = 8;
+const MAIN_COLOR = '#4D7C0F';
+const HEADER_TEXT_COLOR = '#FFFFFF';
+const SLATE_LOCATION_COLOR = '#D1D5DB';
+const TEXT_PRIMARY_DARK = '#1F2937';
+const TEXT_SECONDARY_GREY = '#6B7280';
+const BACKGROUND_LIGHT_GREY = '#F9FAFB';
+const CARD_BACKGROUND = '#FFFFFF';
+const BORDER_GREY = '#E5E5E5';
+
+const LIGHT_GREEN_BACKGROUND = '#F0FDF4';
+const TEXT_LIGHT_GREY = '#B0B0B0';
+const TEXT_DARK_GREY = '#4B5563';
+
 interface EquipmentCardProps {
   equipment: RentalEquipment;
   onPress: () => void;
@@ -13,11 +27,10 @@ export function EquipmentCard({ equipment, onPress }: EquipmentCardProps) {
 
   const handleBookmarkToggle = () => {
     setIsBookmarked(!isBookmarked);
-    // You might want to dispatch an action or call an API here
   };
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.imageContainer}>
         {equipment.image ? (
           <Image
@@ -27,18 +40,23 @@ export function EquipmentCard({ equipment, onPress }: EquipmentCardProps) {
           />
         ) : (
           <View style={styles.imagePlaceholder}>
-            <MaterialIcons name="image" size={50} color="#D1D5DB" />
+            <MaterialIcons
+              name="image"
+              size={50}
+              color={SLATE_LOCATION_COLOR}
+            />
             <Text style={styles.imagePlaceholderText}>No Image</Text>
           </View>
         )}
         <TouchableOpacity
           style={styles.bookmarkButton}
           onPress={handleBookmarkToggle}
+          activeOpacity={0.7}
         >
           <Ionicons
             name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
             size={18}
-            color="#4D7C0F" // Main green
+            color={MAIN_COLOR}
           />
         </TouchableOpacity>
         {equipment.hasDriver && (
@@ -56,15 +74,27 @@ export function EquipmentCard({ equipment, onPress }: EquipmentCardProps) {
 
         <View style={styles.specsRow}>
           <View style={styles.specItem}>
-            <MaterialIcons name="dashboard" size={12} color="#6B7280" />
+            <MaterialIcons
+              name="dashboard"
+              size={12}
+              color={TEXT_SECONDARY_GREY}
+            />
             <Text style={styles.specText}>{equipment.spec1 || 'N/A'}</Text>
           </View>
           <View style={styles.specItem}>
-            <MaterialIcons name="local-gas-station" size={12} color="#6B7280" />
+            <MaterialIcons
+              name="local-gas-station"
+              size={12}
+              color={TEXT_SECONDARY_GREY}
+            />
             <Text style={styles.specText}>{equipment.spec2 || 'N/A'}</Text>
           </View>
           <View style={styles.specItem}>
-            <MaterialIcons name="settings" size={12} color="#6B7280" />
+            <MaterialIcons
+              name="settings"
+              size={12}
+              color={TEXT_SECONDARY_GREY}
+            />
             <Text style={styles.specText}>{equipment.spec3 || 'N/A'}</Text>
           </View>
         </View>
@@ -84,7 +114,7 @@ export function EquipmentCard({ equipment, onPress }: EquipmentCardProps) {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.bookNowButton}>
+        <TouchableOpacity style={styles.bookNowButton} activeOpacity={0.7}>
           <Text style={styles.bookNowButtonText}>Book Now</Text>
         </TouchableOpacity>
       </View>
@@ -95,8 +125,8 @@ export function EquipmentCard({ equipment, onPress }: EquipmentCardProps) {
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
     overflow: 'hidden',
     marginHorizontal: 4,
     maxWidth: '48%',
@@ -104,13 +134,13 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
-    shadowRadius: 3,
+    shadowRadius: 2,
     elevation: 2,
   },
   imageContainer: {
     width: '100%',
     height: 100,
-    backgroundColor: '#F0FDF4', // Light green
+    backgroundColor: LIGHT_GREEN_BACKGROUND,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -124,19 +154,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     height: '100%',
-    backgroundColor: '#F0FDF4', // Light green
+    backgroundColor: LIGHT_GREEN_BACKGROUND,
   },
   imagePlaceholderText: {
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Archivo-Regular',
     fontSize: 10,
-    color: '#B0B0B0',
+    color: TEXT_LIGHT_GREY,
     marginTop: 4,
   },
   bookmarkButton: {
     position: 'absolute',
     top: 6,
     right: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: CARD_BACKGROUND,
     borderRadius: 6,
     padding: 5,
     zIndex: 1,
@@ -145,30 +175,30 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 6,
     left: 6,
-    backgroundColor: '#E5E7EB', // Accent grayish background
+    backgroundColor: BORDER_GREY,
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
     zIndex: 1,
   },
   driverBadgeText: {
-    fontFamily: 'PlusJakartaSans-Medium',
+    fontFamily: 'Archivo-Medium',
     fontSize: 9,
-    color: '#4D7C0F', // Main green text
+    color: MAIN_COLOR,
   },
   detailsContainer: {
     padding: 10,
   },
   equipmentName: {
-    fontFamily: 'PlusJakartaSans-Bold',
+    fontFamily: 'Archivo-Bold',
     fontSize: 14,
-    color: '#1F2937',
+    color: TEXT_PRIMARY_DARK,
     marginBottom: 0,
   },
   equipmentType: {
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Archivo-Regular',
     fontSize: 11,
-    color: '#6B7280',
+    color: TEXT_SECONDARY_GREY,
     marginBottom: 6,
   },
   specsRow: {
@@ -184,9 +214,9 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   specText: {
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Archivo-Regular',
     fontSize: 10,
-    color: '#6B7280',
+    color: TEXT_SECONDARY_GREY,
     marginLeft: 3,
   },
   priceAndRatingRow: {
@@ -200,14 +230,14 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   price: {
-    fontFamily: 'PlusJakartaSans-Bold',
+    fontFamily: 'Archivo-Bold',
     fontSize: 16,
-    color: '#4D7C0F', // Main green
+    color: MAIN_COLOR,
   },
   priceUnit: {
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Archivo-Regular',
     fontSize: 10,
-    color: '#6B7280',
+    color: TEXT_SECONDARY_GREY,
     marginLeft: 1,
   },
   ratingContainer: {
@@ -215,21 +245,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ratingText: {
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    fontFamily: 'Archivo-Medium',
     fontSize: 10,
-    color: '#4B5563',
+    color: TEXT_DARK_GREY,
     marginLeft: 2,
   },
   bookNowButton: {
-    backgroundColor: '#4D7C0F', // Main green
+    backgroundColor: MAIN_COLOR,
     borderRadius: 6,
     paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bookNowButtonText: {
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    fontFamily: 'Archivo-Medium',
     fontSize: 13,
-    color: '#FFFFFF',
+    color: HEADER_TEXT_COLOR,
   },
 });

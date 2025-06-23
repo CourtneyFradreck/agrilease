@@ -1,357 +1,700 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  Platform,
+  TouchableOpacity,
+  Modal,
+  SafeAreaView,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { MaterialIcons, Feather } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useData } from '@/context/DataContext';
 import { Button } from '@/components/Button';
 import dayjs from 'dayjs';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 
-// Only import CalendarPicker on native platforms
-let CalendarPicker: any = null;
-if (Platform.OS !== 'web') {
-  CalendarPicker = require('react-native-calendar-picker').default;
+dayjs.extend(isSameOrAfter);
+dayjs.extend(isSameOrBefore);
+
+import { Calendar, LocaleConfig } from 'react-native-calendars';
+
+interface DayPressEvent {
+  dateString: string;
+  day: number;
+  month: number;
+  year: number;
+  timestamp: number;
 }
 
-export default function BookingRequest() {
+LocaleConfig.locales['en'] = {
+  monthNames: [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ],
+  monthNamesShort: [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ],
+  dayNames: [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ],
+  dayNamesShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  today: 'Today',
+};
+LocaleConfig.defaultLocale = 'en';
+
+const BORDER_RADIUS = 8;
+const MAIN_COLOR = '#4D7C0F';
+const HEADER_TEXT_COLOR = '#FFFFFF';
+const TEXT_PRIMARY_DARK = '#1F2937';
+const TEXT_SECONDARY_GREY = '#6B7280';
+const BACKGROUND_LIGHT_GREY = '#F9FAFB';
+const CARD_BACKGROUND = '#FFFFFF';
+const BORDER_GREY = '#E5E5E5';
+const CALENDAR_TODAY_BG = '#F0FDF4';
+const CALENDAR_RANGE_BG = '#D4EDD4';
+const ERROR_RED = '#DC2626';
+
+export default function BookingPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { getRentalEquipmentById, createBooking } = useData();
-  
+
   const equipment = getRentalEquipmentById(id);
-  
+
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  
+  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+
   if (!equipment) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Equipment not found</Text>
-        <Button onPress={() => router.back()} text="Go Back" style={styles.goBackButton} />
+        <Button
+          onPress={() => router.back()}
+          text="Go Back"
+          style={styles.goBackButton}
+        />
       </View>
     );
   }
-  
-  const handleDateChange = (date: any, type: string) => {
-    if (type === 'START_DATE') {
-      setStartDate(date?.toDate() || null);
-    } else {
-      setEndDate(date?.toDate() || null);
+
+  const handleDayPress = useCallback(
+    (day: DayPressEvent) => {
+      const selectedMoment = dayjs(day.dateString);
+
+      if (!startDate || selectedMoment.isBefore(dayjs(startDate), 'day')) {
+        setStartDate(selectedMoment.toDate());
+        setEndDate(null);
+      } else if (
+        startDate &&
+        !endDate &&
+        selectedMoment.isSameOrAfter(dayjs(startDate), 'day')
+      ) {
+        setEndDate(selectedMoment.toDate());
+      } else if (startDate && endDate) {
+        setStartDate(selectedMoment.toDate());
+        setEndDate(null);
+      }
+    },
+    [startDate, endDate],
+  );
+
+  const rentalDays = useMemo(() => {
+    if (startDate && endDate) {
+      const diffDays = dayjs(endDate).diff(dayjs(startDate), 'day') + 1;
+      return Math.max(1, diffDays);
     }
-  };
-  
-  const rentalDays = startDate && endDate 
-    ? Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
-    : 0;
-    
+    return 0;
+  }, [startDate, endDate]);
+
   const totalPrice = rentalDays * (equipment.rentalPrice || 0);
-  
-  const handleSubmitRequest = () => {
+
+  const handleSubmitRequest = async () => {
     if (!startDate || !endDate) {
-      Alert.alert('Missing Dates', 'Please select both start and end dates');
+      Alert.alert('Missing Dates', 'Please select both start and end dates.');
       return;
     }
-    
-    if (endDate < startDate) {
-      Alert.alert('Invalid Dates', 'End date cannot be earlier than start date');
+
+    if (dayjs(endDate).isBefore(dayjs(startDate), 'day')) {
+      Alert.alert(
+        'Invalid Dates',
+        'End date cannot be earlier than start date.',
+      );
       return;
     }
-    
-    createBooking({
-      equipmentId: equipment.id,
-      startDate,
-      endDate,
-      totalPrice,
-    });
-    
-    Alert.alert(
-      'Booking Request Sent',
-      `Your request to rent ${equipment.name} has been sent to the owner. You will be notified once they respond.`,
-      [
-        { 
-          text: 'OK', 
-          onPress: () => router.push('/(tabs)') 
-        }
-      ]
-    );
+
+    try {
+      await createBooking({
+        equipmentId: equipment.id,
+        startDate,
+        endDate,
+        totalPrice,
+      });
+
+      Alert.alert(
+        'Booking Request Sent',
+        `Your request to rent ${equipment.name} has been sent to the owner. You will be notified once they respond.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => router.push('/(tabs)'),
+          },
+        ],
+      );
+    } catch (error) {
+      console.error('Failed to create booking:', error);
+      Alert.alert(
+        'Booking Failed',
+        'There was an issue sending your booking request. Please try again.',
+        [{ text: 'OK' }],
+      );
+    }
   };
 
+  const isSubmitDisabled = !startDate || !endDate || rentalDays <= 0;
+
+  const markedDates = useMemo(() => {
+    const dates: { [key: string]: any } = {};
+    const today = dayjs().format('YYYY-MM-DD');
+
+    dates[today] = {
+      ...dates[today],
+      customStyles: {
+        container: {
+          backgroundColor: CALENDAR_TODAY_BG,
+          borderRadius: BORDER_RADIUS / 2,
+        },
+        text: {
+          color: MAIN_COLOR,
+          fontFamily: 'Archivo-Bold',
+        },
+      },
+    };
+
+    if (startDate && endDate) {
+      let currentDate = dayjs(startDate);
+      while (currentDate.isSameOrBefore(dayjs(endDate), 'day')) {
+        const dateString = currentDate.format('YYYY-MM-DD');
+        dates[dateString] = {
+          color: CALENDAR_RANGE_BG,
+          textColor: TEXT_PRIMARY_DARK,
+          startingDay: currentDate.isSame(dayjs(startDate), 'day'),
+          endingDay: currentDate.isSame(dayjs(endDate), 'day'),
+          customStyles: {
+            container: {
+              backgroundColor: CALENDAR_RANGE_BG,
+              borderRadius: 0,
+              ...(currentDate.isSame(dayjs(startDate), 'day') && {
+                borderTopLeftRadius: BORDER_RADIUS / 2,
+                borderBottomLeftRadius: BORDER_RADIUS / 2,
+              }),
+              ...(currentDate.isSame(dayjs(endDate), 'day') && {
+                borderTopRightRadius: BORDER_RADIUS / 2,
+                borderBottomRightRadius: BORDER_RADIUS / 2,
+              }),
+            },
+            text: {
+              color: TEXT_PRIMARY_DARK,
+            },
+          },
+        };
+        currentDate = currentDate.add(1, 'day');
+      }
+    } else if (startDate) {
+      const dateString = dayjs(startDate).format('YYYY-MM-DD');
+      dates[dateString] = {
+        selected: true,
+        startingDay: true,
+        endingDay: true,
+        color: CALENDAR_RANGE_BG,
+        textColor: TEXT_PRIMARY_DARK,
+        customStyles: {
+          container: {
+            backgroundColor: CALENDAR_RANGE_BG,
+            borderRadius: BORDER_RADIUS / 2,
+          },
+          text: {
+            color: TEXT_PRIMARY_DARK,
+          },
+        },
+      };
+    }
+    return dates;
+  }, [startDate, endDate]);
+
+  const { name, rentalPrice } = equipment;
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.equipmentSummary}>
-        <Text style={styles.summaryTitle}>Requesting to Rent</Text>
-        <Text style={styles.equipmentName}>{equipment.name}</Text>
-        <Text style={styles.equipmentPrice}>
-          ${equipment.rentalPrice?.toFixed(2)} per day
-        </Text>
-      </View>
-      
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <MaterialIcons name="calendar-today" size={20} color="#4D7C0F" />
-          <Text style={styles.sectionTitle}>Select Rental Dates</Text>
-        </View>
-        
-        {Platform.OS !== 'web' && CalendarPicker && (
-          <View style={styles.calendarContainer}>
-            <CalendarPicker
-              startFromMonday={true}
-              allowRangeSelection={true}
-              minDate={new Date()}
-              todayBackgroundColor="#F0FDF4"
-              selectedDayColor="#4D7C0F"
-              selectedDayTextColor="#FFFFFF"
-              onDateChange={handleDateChange}
-              textStyle={{
-                fontFamily: 'Inter-Regular',
-                color: '#4B5563',
-              }}
-              selectedRangeStartStyle={{
-                backgroundColor: '#4D7C0F',
-              }}
-              selectedRangeEndStyle={{
-                backgroundColor: '#4D7C0F',
-              }}
-              selectedRangeStyle={{
-                backgroundColor: '#E5F2DC',
-              }}
-            />
-          </View>
-        )}
-        
-        <View style={styles.datesContainer}>
-          <View style={styles.dateBox}>
-            <Text style={styles.dateLabel}>Start Date</Text>
-            <Text style={styles.dateValue}>
-              {startDate ? dayjs(startDate).format('MMM D, YYYY') : 'Select date'}
-            </Text>
-          </View>
-          
-          <View style={styles.dateBox}>
-            <Text style={styles.dateLabel}>End Date</Text>
-            <Text style={styles.dateValue}>
-              {endDate ? dayjs(endDate).format('MMM D, YYYY') : 'Select date'}
-            </Text>
-          </View>
-        </View>
-      </View>
-      
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Rental Summary</Text>
-        
-        <View style={styles.summaryContainer}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Rental Period</Text>
-            <Text style={styles.summaryValue}>{rentalDays} days</Text>
-          </View>
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Daily Rate</Text>
-            <Text style={styles.summaryValue}>${equipment.rentalPrice?.toFixed(2)}</Text>
-          </View>
-          
-          <View style={styles.divider} />
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>${totalPrice.toFixed(2)}</Text>
-          </View>
-        </View>
-      </View>
-      
-      <View style={styles.policySection}>
-        <View style={styles.policyItem}>
-          <Feather name="check" size={20} color="#4D7C0F" />
-          <Text style={styles.policyText}>Free cancellation up to 48 hours before pickup</Text>
-        </View>
-        
-        <View style={styles.policyItem}>
-          <Feather name="check" size={20} color="#4D7C0F" />
-          <Text style={styles.policyText}>Equipment insurance included</Text>
-        </View>
-        
-        <View style={styles.policyItem}>
-          <Feather name="check" size={20} color="#4D7C0F" />
-          <Text style={styles.policyText}>Pay on pickup or through the app</Text>
-        </View>
-      </View>
-      
-      <View style={styles.buttonsContainer}>
-        <Button 
+    <View style={styles.fullScreenContainer}>
+      <SafeAreaView style={styles.header}>
+        <TouchableOpacity
           onPress={() => router.back()}
-          text="Cancel"
-          variant="secondary"
-          style={styles.cancelButton}
-        />
-        
-        <Button 
+          style={styles.backButton}
+          accessibilityLabel="Go back to previous screen"
+        >
+          <MaterialIcons
+            name="arrow-back"
+            size={24}
+            color={HEADER_TEXT_COLOR}
+          />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Confirm Booking</Text>
+        <View style={{ width: 24 }} />
+      </SafeAreaView>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.equipmentSummary}>
+          <Text style={styles.summaryTitle}>Requesting to Rent</Text>
+          <Text style={styles.equipmentName}>{name}</Text>
+          <Text style={styles.equipmentPrice}>
+            ${rentalPrice?.toFixed(2)} per day
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <MaterialIcons name="calendar-today" size={22} color={MAIN_COLOR} />
+            <Text style={styles.sectionTitle}>Select Rental Dates</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.selectDatesButton}
+            onPress={() => setIsCalendarVisible(true)}
+            accessibilityLabel={
+              startDate && endDate
+                ? `Selected dates from ${dayjs(startDate).format(
+                    'MMM D',
+                  )} to ${dayjs(endDate).format('MMM D')}`
+                : 'Select rental dates'
+            }
+          >
+            <Text style={styles.selectDatesButtonText}>
+              {startDate && endDate
+                ? `${dayjs(startDate).format('MMM D, YYYY')} - ${dayjs(
+                    endDate,
+                  ).format('MMM D, YYYY')}`
+                : 'Tap to select dates'}
+            </Text>
+            <MaterialIcons
+              name="chevron-right"
+              size={24}
+              color={TEXT_PRIMARY_DARK}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Rental Summary</Text>
+          <View style={styles.summaryGrid}>
+            <View style={styles.summaryGridItem}>
+              <Text style={styles.summaryItemLabel}>Daily Rate</Text>
+              <Text style={styles.summaryItemValue}>
+                ${rentalPrice?.toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.summaryGridItem}>
+              <Text style={styles.summaryItemLabel}>Rental Period</Text>
+              <Text style={styles.summaryItemValue}>
+                {rentalDays > 0 ? `${rentalDays} days` : 'Not selected'}
+              </Text>
+            </View>
+            <View style={[styles.summaryGridItem, styles.summaryTotalItem]}>
+              <Text style={styles.summaryTotalLabel}>Total Cost</Text>
+              <Text style={styles.summaryTotalValue}>
+                ${totalPrice.toFixed(2)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.policySection}>
+          <Text style={styles.sectionTitle}>Booking Policies</Text>
+          <View style={styles.policyList}>
+            <Text style={styles.policyBullet}>
+              • Free cancellation up to 48 hours before pickup.
+            </Text>
+            <Text style={styles.policyBullet}>
+              • Equipment insurance is included in your rental.
+            </Text>
+            <Text style={styles.policyBullet}>
+              • Flexible payment options: Pay on pickup or securely through the
+              app.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      <View style={styles.bottomBar}>
+        <View style={styles.priceFooter}>
+          <Text style={styles.priceFrom_bottomBar}>Total</Text>
+          <Text style={styles.price_bottomBar}>${totalPrice.toFixed(2)}</Text>
+        </View>
+        <Button
           onPress={handleSubmitRequest}
           text="Submit Request"
-          style={styles.submitButton}
+          style={styles.submitBookingButton}
+          textStyle={styles.submitBookingButtonText}
+          disabled={isSubmitDisabled}
+          accessibilityLabel="Submit booking request"
         />
       </View>
-    </ScrollView>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isCalendarVisible}
+        onRequestClose={() => setIsCalendarVisible(false)}
+      >
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalTitle}>Select Your Rental Dates</Text>
+            <Calendar
+              onDayPress={handleDayPress}
+              markingType={'custom'}
+              markedDates={markedDates}
+              minDate={dayjs().format('YYYY-MM-DD')}
+              enableSwipeMonths={true}
+              theme={{
+                calendarBackground: CARD_BACKGROUND,
+                textSectionTitleColor: TEXT_SECONDARY_GREY,
+                selectedDayBackgroundColor: MAIN_COLOR,
+                selectedDayTextColor: CARD_BACKGROUND,
+                todayBackgroundColor: CALENDAR_TODAY_BG,
+                todayTextColor: MAIN_COLOR,
+                dayTextColor: TEXT_PRIMARY_DARK,
+                textDisabledColor: BORDER_GREY,
+                dotColor: MAIN_COLOR,
+                selectedDotColor: CARD_BACKGROUND,
+                arrowColor: MAIN_COLOR,
+                monthTextColor: TEXT_PRIMARY_DARK,
+                textMonthFontFamily: 'Archivo-Bold',
+                textDayHeaderFontFamily: 'Archivo-Medium',
+                textDayFontFamily: 'Archivo-Regular',
+              }}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonClear]}
+                onPress={() => {
+                  setStartDate(null);
+                  setEndDate(null);
+                }}
+                accessibilityLabel="Clear selected dates"
+              >
+                <Text style={styles.modalButtonTextClear}>Clear Dates</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm]}
+                onPress={() => setIsCalendarVisible(false)}
+                accessibilityLabel="Confirm date selection and close calendar"
+              >
+                <Text style={styles.modalButtonTextConfirm}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: BACKGROUND_LIGHT_GREY,
   },
-  equipmentSummary: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+  scrollContent: {
+    paddingBottom: 100,
   },
-  summaryTitle: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  equipmentName: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 20,
-    color: '#333333',
-    marginBottom: 4,
-  },
-  equipmentPrice: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    color: '#4D7C0F',
-  },
-  section: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    marginBottom: 16,
-    borderRadius: 8,
-    marginHorizontal: 16,
-  },
-  sectionHeader: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 18,
-    color: '#333333',
-    marginLeft: 8,
-  },
-  calendarContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  datesContainer: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === 'android' ? 35 : 45,
+    paddingBottom: 10,
+    backgroundColor: MAIN_COLOR,
   },
-  dateBox: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 12,
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
+  backButton: {
+    padding: 5,
   },
-  dateLabel: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  dateValue: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 16,
-    color: '#333333',
-  },
-  summaryContainer: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  summaryLabel: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  summaryValue: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    color: '#4B5563',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E5E5E5',
-    marginVertical: 12,
-  },
-  totalLabel: {
-    fontFamily: 'Inter-Bold',
+  headerTitle: {
+    fontFamily: 'Archivo-Bold',
     fontSize: 18,
-    color: '#333333',
-  },
-  totalValue: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 18,
-    color: '#4D7C0F',
-  },
-  policySection: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    marginBottom: 16,
-    borderRadius: 8,
-    marginHorizontal: 16,
-  },
-  policyItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  policyText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#4B5563',
-    marginLeft: 8,
-  },
-  buttonsContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
-  },
-  cancelButton: {
-    flex: 1,
-    marginRight: 8,
-  },
-  submitButton: {
-    flex: 1,
-    marginLeft: 8,
+    color: HEADER_TEXT_COLOR,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+    backgroundColor: BACKGROUND_LIGHT_GREY,
   },
   errorText: {
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'Archivo-Bold',
     fontSize: 18,
-    color: '#DC2626',
+    color: ERROR_RED,
     marginBottom: 16,
   },
   goBackButton: {
     width: 150,
+  },
+  equipmentSummary: {
+    backgroundColor: CARD_BACKGROUND,
+    padding: 16,
+    marginBottom: 16,
+    marginTop: 16,
+    borderRadius: BORDER_RADIUS,
+    marginHorizontal: 15,
+    zIndex: 1,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+  },
+  summaryTitle: {
+    fontFamily: 'Archivo-Medium',
+    fontSize: 14,
+    color: TEXT_SECONDARY_GREY,
+    marginBottom: 4,
+  },
+  equipmentName: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 20,
+    color: TEXT_PRIMARY_DARK,
+    marginBottom: 4,
+  },
+  equipmentPrice: {
+    fontFamily: 'Archivo-Medium',
+    fontSize: 16,
+    color: MAIN_COLOR,
+  },
+  section: {
+    backgroundColor: CARD_BACKGROUND,
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: BORDER_RADIUS,
+    marginHorizontal: 15,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 16,
+    color: TEXT_PRIMARY_DARK,
+    marginLeft: 8,
+  },
+  selectDatesButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: BACKGROUND_LIGHT_GREY,
+    borderRadius: BORDER_RADIUS,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+  },
+  selectDatesButtonText: {
+    fontFamily: 'Archivo-Medium',
+    fontSize: 15,
+    color: TEXT_PRIMARY_DARK,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  summaryGridItem: {
+    width: '48%',
+    backgroundColor: BACKGROUND_LIGHT_GREY,
+    borderRadius: BORDER_RADIUS,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+    justifyContent: 'space-between',
+  },
+  summaryItemLabel: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 13,
+    color: TEXT_SECONDARY_GREY,
+    marginBottom: 4,
+  },
+  summaryItemValue: {
+    fontFamily: 'Archivo-Medium',
+    fontSize: 15,
+    color: TEXT_PRIMARY_DARK,
+  },
+  summaryTotalItem: {
+    width: '100%',
+    backgroundColor: CARD_BACKGROUND,
+    borderColor: MAIN_COLOR,
+    borderWidth: 2,
+    marginTop: 5,
+  },
+  summaryTotalLabel: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 16,
+    color: TEXT_PRIMARY_DARK,
+  },
+  summaryTotalValue: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 20,
+    color: MAIN_COLOR,
+  },
+  policySection: {
+    backgroundColor: CARD_BACKGROUND,
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: BORDER_RADIUS,
+    marginHorizontal: 15,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+  },
+  policyList: {
+    marginTop: 10,
+  },
+  policyBullet: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 14,
+    color: TEXT_PRIMARY_DARK,
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: MAIN_COLOR,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderTopLeftRadius: BORDER_RADIUS * 2,
+    borderTopRightRadius: BORDER_RADIUS * 2,
+  },
+  priceFooter: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  priceFrom_bottomBar: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 13,
+    color: HEADER_TEXT_COLOR,
+    marginRight: 4,
+  },
+  price_bottomBar: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 22,
+    color: HEADER_TEXT_COLOR,
+  },
+  submitBookingButton: {
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    minWidth: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: CARD_BACKGROUND,
+  },
+  submitBookingButtonText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 16,
+    color: MAIN_COLOR,
+  },
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  modalView: {
+    width: '90%',
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS * 2,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+  },
+  modalTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 18,
+    color: TEXT_PRIMARY_DARK,
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    width: '100%',
+    paddingHorizontal: 5,
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: BORDER_RADIUS,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 5,
+  },
+  modalButtonClear: {
+    backgroundColor: BACKGROUND_LIGHT_GREY,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+  },
+  modalButtonTextClear: {
+    fontFamily: 'Archivo-Medium',
+    fontSize: 16,
+    color: TEXT_SECONDARY_GREY,
+  },
+  modalButtonConfirm: {
+    backgroundColor: MAIN_COLOR,
+  },
+  modalButtonTextConfirm: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 16,
+    color: CARD_BACKGROUND,
   },
 });
