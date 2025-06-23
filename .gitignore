@@ -32,4 +32,23 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
-package-lock.json
+
+# Android/IntelliJ
+android/app/build/
+android/.gradle
+android/local.properties
+android/*.iml
+.idea/
+android/.settings/
+android/app/release/
+*.hprof
+.cxx/
+android/captures/
+android/
+
+# Keystore files
+**/*.keystore
+**/*.jks
+
+# environment files
+.env

@@ -1,27 +1,34 @@
-import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { useFonts, Inter_400Regular, Inter_500Medium, Inter_700Bold } from '@expo-google-fonts/inter';
+
+import {
+  useFonts,
+  Archivo_400Regular,
+  Archivo_500Medium,
+  Archivo_600SemiBold,
+  Archivo_700Bold,
+} from '@expo-google-fonts/archivo';
+
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '@/context/AuthContext';
 import { DataProvider } from '@/context/DataContext';
+import { Platform } from 'react-native';
 
-// Initialize splash screen configuration before any React rendering
 if (Platform.OS !== 'web') {
-  SplashScreen.preventAutoHideAsync().catch(() => {
-    /* ignore errors */
-  });
+  SplashScreen.preventAutoHideAsync().catch(() => {});
 }
 
 export default function RootLayout() {
   useFrameworkReady();
 
+  const [splashComplete, setSplashComplete] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
-    'Inter-Regular': Inter_400Regular,
-    'Inter-Medium': Inter_500Medium,
-    'Inter-Bold': Inter_700Bold,
+    'Archivo-Regular': Archivo_400Regular,
+    'Archivo-Medium': Archivo_500Medium,
+    'Archivo-SemiBold': Archivo_600SemiBold,
+    'Archivo-Bold': Archivo_700Bold,
   });
 
   useEffect(() => {
@@ -38,7 +45,6 @@ export default function RootLayout() {
     hideSplash();
   }, [fontsLoaded, fontError]);
 
-  // Return null to prevent rendering until fonts are ready
   if (!fontsLoaded && !fontError) {
     return null;
   }
@@ -46,26 +52,50 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <DataProvider>
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack>
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="equipment/[id]" options={{ 
-            headerShown: true, 
-            headerTitle: 'Equipment Details',
-            headerBackTitle: 'Back',
-            headerTintColor: '#4D7C0F',
-            headerStyle: { backgroundColor: '#F5F5F5' },
-          }} />
-          <Stack.Screen name="booking/[id]" options={{ 
-            headerShown: true, 
-            headerTitle: 'Request Booking',
-            headerBackTitle: 'Back',
-            headerTintColor: '#4D7C0F',
-            headerStyle: { backgroundColor: '#F5F5F5' },
-          }} />
+          <Stack.Screen
+            name="equipment/[id]"
+            options={{
+              headerShown: false,
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="booking/[id]"
+            options={{
+              headerShown: false,
+              headerTitle: 'Request Booking',
+              headerTintColor: '#1F2937',
+              headerStyle: {
+                backgroundColor: '#FFFFFF',
+              },
+              headerTitleStyle: {
+                fontFamily: 'Archivo-SemiBold',
+                fontSize: 18,
+              },
+            }}
+          />
+          <Stack.Screen
+            name="messages/[id]"
+            options={{
+              headerShown: false,
+              headerTitle: 'Messages',
+              headerTintColor: '#1F2937',
+              headerStyle: {
+                backgroundColor: '#FFFFFF',
+              },
+              headerTitleStyle: {
+                fontFamily: 'Archivo-SemiBold',
+                fontSize: 18,
+              },
+            }}
+          />
           <Stack.Screen name="+not-found" options={{ headerShown: false }} />
         </Stack>
-        <StatusBar style="auto" />
+        <StatusBar style="dark" />
       </DataProvider>
     </AuthProvider>
   );
