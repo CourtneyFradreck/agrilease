@@ -72,6 +72,15 @@ export default function Register() {
       if (!fullname || !email || !phone) {
         setError('All personal information fields are required.');
         isValid = false;
+      } else if (fullname.trim().length < 3) {
+        setError('Full name must be at least 3 letters.');
+        isValid = false;
+      } else if (!/^\S+@\S+\.\S+$/.test(email)) {
+        setError('Please enter a valid email address.');
+        isValid = false;
+      } else if (!/^\d{10}$/.test(phone)) {
+        setError('Phone number must be exactly 10 digits.');
+        isValid = false;
       }
     } else if (currentStep === 1) {
       if (!password || !confirmPassword) {
@@ -156,6 +165,7 @@ export default function Register() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                autoComplete="password-new"
               />
             </View>
 
@@ -168,6 +178,7 @@ export default function Register() {
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
+                autoComplete="password-new"
               />
             </View>
           </>
