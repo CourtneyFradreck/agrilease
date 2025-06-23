@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -33,12 +34,16 @@ export default function Register() {
   const [userType, setUserType] = useState<'farmer' | 'owner'>('farmer');
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const totalSteps = 3;
 
-  const { register } = useAuth();
+  const { register, loadingAuth } = useAuth();
 
   const handleRegister = async () => {
+    if (isSubmitting) return; // Prevent double submission
+    
     setError(null);
+    setIsSubmitting(true);
 
     try {
       const success = await register(
@@ -48,8 +53,12 @@ export default function Register() {
         password,
         userType,
       );
+      
       if (success) {
-        router.replace('/(tabs)');
+        // Small delay to ensure state is properly set
+        setTimeout(() => {
+          router.replace('/(tabs)');
+        }, 500);
       } else {
         setError(
           'Registration failed. Please check your details and try again.',
@@ -61,6 +70,8 @@ export default function Register() {
           'An unexpected error occurred during registration.',
       );
       console.error('Registration error:', err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -71,6 +82,15 @@ export default function Register() {
     if (currentStep === 0) {
       if (!fullname || !email || !phone) {
         setError('All personal information fields are required.');
+        isValid = false;
+      } else if (fullname.trim().length < 3) {
+        setError('Full name must be at least 3 letters.');
+        isValid = false;
+      } else if (!/^\S+@\S+\.\S+$/.test(email)) {
+        setError('Please enter a valid email address.');
+        isValid = false;
+      } else if (!/^\d{10}$/.test(phone)) {
+        setError('Phone number must be exactly 10 digits.');
         isValid = false;
       }
     } else if (currentStep === 1) {
@@ -115,6 +135,7 @@ export default function Register() {
                 placeholderTextColor={TEXT_SECONDARY_GREY}
                 value={fullname}
                 onChangeText={setFullName}
+                editable={!isSubmitting}
               />
             </View>
 
@@ -128,6 +149,7 @@ export default function Register() {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                editable={!isSubmitting}
               />
             </View>
 
@@ -140,6 +162,7 @@ export default function Register() {
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
+                editable={!isSubmitting}
               />
             </View>
           </>
@@ -156,6 +179,8 @@ export default function Register() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                autoComplete="password-new"
+                editable={!isSubmitting}
               />
             </View>
 
@@ -168,6 +193,8 @@ export default function Register() {
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
+                autoComplete="password-new"
+                editable={!isSubmitting}
               />
             </View>
           </>
@@ -184,6 +211,7 @@ export default function Register() {
                 ]}
                 onPress={() => setUserType('farmer')}
                 activeOpacity={0.7}
+                disabled={isSubmitting}
               >
                 <Text
                   style={[
@@ -202,6 +230,7 @@ export default function Register() {
                 ]}
                 onPress={() => setUserType('owner')}
                 activeOpacity={0.7}
+                disabled={isSubmitting}
               >
                 <Text
                   style={[
@@ -219,6 +248,16 @@ export default function Register() {
         return null;
     }
   };
+
+  // Show loading overlay during auth operations
+  if (loadingAuth && !isSubmitting) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={MAIN_COLOR} />
+        <Text style={styles.loadingText}>Setting up your account...</Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -248,20 +287,34 @@ export default function Register() {
                   onPress={handlePrevious}
                   style={styles.previousButton}
                   textStyle={styles.previousButtonText}
+                  disabled={isSubmitting}
                 />
               )}
               <Button
                 text={
-                  currentStep === totalSteps - 1 ? 'Create Account' : 'Next'
+                  currentStep === totalSteps - 1 
+                    ? (isSubmitting ? 'Creating Account...' : 'Create Account')
+                    : 'Next'
                 }
                 onPress={validateAndProceed}
                 style={[
                   styles.nextButton,
                   currentStep === 0 && styles.nextButtonFullWidth,
                   currentStep === totalSteps - 1 && styles.finalButton,
+                  isSubmitting && styles.disabledButton,
                 ]}
+                disabled={isSubmitting}
               />
             </View>
+
+            {isSubmitting && (
+              <View style={styles.submittingContainer}>
+                <ActivityIndicator size="small" color={MAIN_COLOR} />
+                <Text style={styles.submittingText}>
+                  Creating your account, please wait...
+                </Text>
+              </View>
+            )}
 
             <View style={styles.progressIndicatorContainer}>
               {[...Array(totalSteps)].map((_, index) => (
@@ -278,8 +331,13 @@ export default function Register() {
             <View style={styles.loginContainer}>
               <Text style={styles.loginText}>Already have an account? </Text>
               <Link href="/login" asChild>
-                <TouchableOpacity activeOpacity={0.7}>
-                  <Text style={styles.loginLink}>Sign In</Text>
+                <TouchableOpacity activeOpacity={0.7} disabled={isSubmitting}>
+                  <Text style={[
+                    styles.loginLink,
+                    isSubmitting && styles.disabledLink
+                  ]}>
+                    Sign In
+                  </Text>
                 </TouchableOpacity>
               </Link>
             </View>
@@ -417,6 +475,34 @@ const styles = StyleSheet.create({
   finalButton: {
     backgroundColor: MAIN_COLOR,
   },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: BACKGROUND_LIGHT_GREY,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontFamily: 'Archivo-Regular',
+    fontSize: 16,
+    color: TEXT_SECONDARY_GREY,
+  },
+  submittingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 15,
+    width: '100%',
+  },
+  submittingText: {
+    marginLeft: 10,
+    fontFamily: 'Archivo-Regular',
+    fontSize: 14,
+    color: TEXT_SECONDARY_GREY,
+  },
   progressIndicatorContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -450,5 +536,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: MAIN_COLOR,
     textDecorationLine: 'underline',
+  },
+  disabledLink: {
+    opacity: 0.5,
   },
 });
