@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,10 @@ import {
   ScrollView,
   Image,
   SafeAreaView,
+  Platform,
+  Animated,
 } from 'react-native';
-import { Fontisto } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { useRouter } from 'expo-router';
 import { FilterModal } from '@/components/FilterModal';
@@ -20,17 +22,17 @@ const ASPECT_RATIO = width / height;
 const LATITUDE_DELTA = 0.0922;
 const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
 
-// Re-defining constants from Dashboard for consistency
+const BORDER_RADIUS = 8;
 const MAIN_COLOR = '#4D7C0F';
+const HEADER_TEXT_COLOR = '#FFFFFF';
 const TEXT_PRIMARY_DARK = '#1F2937';
 const TEXT_SECONDARY_GREY = '#6B7280';
-const BORDER_RADIUS = 10;
-const LIGHT_GREEN_TINT = '#D4EDD4';
-const VERY_LIGHT_GREEN_TINT = '#E6F0E6';
-const HEADER_TEXT_COLOR = '#FFFFFF'; // This will now be less relevant for header BG but useful for text
-const APP_BACKGROUND_COLOR = '#F9FAFB'; // Use this for header background now
+const BACKGROUND_LIGHT_GREY = '#F9FAFB';
+const CARD_BACKGROUND = '#FFFFFF';
+const BORDER_GREY = '#E5E5E5';
 
-// Custom Map Style JSON (Silver Theme) - unchanged
+const LIGHT_GREEN_BACKGROUND = '#F0FDF4';
+
 const mapStyleJson = [
   {
     elementType: 'geometry',
@@ -192,7 +194,6 @@ const mapStyleJson = [
   },
 ];
 
-// Mock Data - unchanged
 const mockClients = [
   {
     id: 'client1',
@@ -201,7 +202,7 @@ const mockClients = [
     contact: '+263 771 234 567',
     image: 'https://via.placeholder.com/150/4D7C0F/FFFFFF?text=Tractor',
     coordinate: {
-      latitude: -17.7565, // North of Harare CBD
+      latitude: -17.7565,
       longitude: 31.0621,
     },
   },
@@ -212,7 +213,7 @@ const mockClients = [
     contact: '+263 772 345 678',
     image: 'https://via.placeholder.com/150/4D7C0F/FFFFFF?text=Harvester',
     coordinate: {
-      latitude: -17.892, // South-east of Harare CBD
+      latitude: -17.892,
       longitude: 31.105,
     },
   },
@@ -223,7 +224,7 @@ const mockClients = [
     contact: '+263 773 456 789',
     image: 'https://via.placeholder.com/150/4D7C0F/FFFFFF?text=Pump',
     coordinate: {
-      latitude: -17.82, // Near Harare CBD
+      latitude: -17.82,
       longitude: 31.02,
     },
   },
@@ -234,7 +235,7 @@ const mockClients = [
     contact: '+263 774 567 890',
     image: 'https://via.placeholder.com/150/4D7C0F/FFFFFF?text=Seeder',
     coordinate: {
-      latitude: -17.85, // West of Harare CBD
+      latitude: -17.85,
       longitude: 30.98,
     },
   },
@@ -245,7 +246,7 @@ const mockClients = [
     contact: '+263 775 678 901',
     image: 'https://via.placeholder.com/150/4D7C0F/FFFFFF?text=Cultivator',
     coordinate: {
-      latitude: -17.8, // North-east of Harare
+      latitude: -17.8,
       longitude: 31.08,
     },
   },
@@ -306,16 +307,50 @@ export default function Discover() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+  const [mapIsInteracting, setMapIsInteracting] = useState(false);
 
-  // Initial region for Harare, Zimbabwe
   const [mapRegion, setMapRegion] = useState({
-    latitude: -17.825166, // Harare latitude
-    longitude: 31.03351, // Harare longitude
+    latitude: -17.825166,
+    longitude: 31.03351,
     latitudeDelta: LATITUDE_DELTA,
     longitudeDelta: LONGITUDE_DELTA,
   });
 
-  // Filter clients for map markers based on search query
+  const animatedOpacity = useRef(new Animated.Value(1)).current;
+  const animatedTranslateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (mapIsInteracting) {
+      Animated.parallel([
+        Animated.timing(animatedOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedTranslateY, {
+          toValue: 50, // Slide down by 50 units
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(animatedOpacity, {
+          toValue: 1,
+          duration: 300,
+          delay: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedTranslateY, {
+          toValue: 0,
+          duration: 300,
+          delay: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [mapIsInteracting]);
+
   const filteredClientsForMap = searchQuery
     ? mockClients.filter(
         (client) =>
@@ -324,7 +359,6 @@ export default function Discover() {
       )
     : mockClients;
 
-  // Filter nearby equipment for the scroll view based on search query
   const filteredNearbyEquipment = searchQuery
     ? mockNearbyEquipment.filter(
         (item) =>
@@ -335,14 +369,14 @@ export default function Discover() {
 
   return (
     <View style={styles.container}>
-      {/* Map View */}
       <MapView
         style={styles.map}
         region={mapRegion}
         showsUserLocation={true}
         followsUserLocation={true}
         customMapStyle={mapStyleJson}
-        // onRegionChangeComplete={setMapRegion}
+        onRegionChange={() => setMapIsInteracting(true)}
+        onRegionChangeComplete={() => setMapIsInteracting(false)}
       >
         {filteredClientsForMap.map((client) => (
           <Marker
@@ -368,98 +402,109 @@ export default function Discover() {
         ))}
       </MapView>
 
-      {/* Header Overlay - Styled to match Dashboard with modifications */}
       <SafeAreaView style={styles.headerContainer}>
-        <View style={styles.headerTopRow}>
-          <TouchableOpacity style={styles.menuButton}>
-            <Fontisto name="nav-icon-list-a" size={20} color={MAIN_COLOR} />{' '}
-            {/* Reduced size and changed color */}
-          </TouchableOpacity>
-          <View style={styles.searchSection}>
-            <View style={styles.searchInputWrapper}>
-              <Fontisto
-                name="search"
-                size={16}
-                color="#A3A3A3"
-                style={styles.searchIcon}
-              />{' '}
-              {/* Reduced size */}
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search equipment..."
-                placeholderTextColor="#A3A3A3"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-            <TouchableOpacity
-              style={styles.filterButton}
-              onPress={() => setIsFilterModalVisible(true)}
-            >
-              <Fontisto name="equalizer" size={18} color={MAIN_COLOR} />{' '}
-              {/* Reduced size */}
-            </TouchableOpacity>
+        <View style={styles.searchAndFilterRow}>
+          <View style={styles.searchInputWrapper}>
+            <Feather
+              name="search"
+              size={20}
+              color={TEXT_SECONDARY_GREY}
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search equipment..."
+              placeholderTextColor={TEXT_SECONDARY_GREY}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
           </View>
-          {/* Removed Notification Button */}
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setIsFilterModalVisible(true)}
+            accessibilityLabel="Open filter options"
+            activeOpacity={0.7}
+          >
+            <Feather name="sliders" size={22} color={MAIN_COLOR} />
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
 
-      {/* Available Equipment Section */}
-      <View style={styles.availableEquipmentContainer}>
-        <Text style={styles.availableTitle}>Available Equipment Near You</Text>
-        {filteredNearbyEquipment.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.availableListContent}
-          >
-            {filteredNearbyEquipment.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.equipmentCard}
-                onPress={() => {
-                  router.push(`/equipment/${item.id}`);
-                }}
-              >
-                <Image
-                  source={{ uri: item.image }}
-                  style={styles.equipmentImage}
-                />
-                <View style={styles.equipmentDetails}>
-                  <Text style={styles.equipmentName} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text style={styles.equipmentType}>{item.type}</Text>
-                  <Text style={styles.equipmentPrice}>
-                    ${item.rentalPrice}
-                    <Text style={styles.equipmentPriceUnit}>/day</Text>
-                  </Text>
-                  <View style={styles.cardActions}>
-                    <TouchableOpacity style={styles.bookNowButton}>
-                      <Text style={styles.bookNowButtonText}>Book Now</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.detailsButton}
-                      onPress={() => router.push(`/equipment/${item.id}`)}
-                    >
-                      <Text style={styles.detailsButtonText}>Details</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={styles.emptyStateContainer}>
-            <Text style={styles.emptyStateTitle}>No equipment found</Text>
-            <Text style={styles.emptyStateText}>
-              Try adjusting your search criteria or check back later.
+      <Animated.View
+        style={[
+          styles.availableEquipmentContainer,
+          {
+            opacity: animatedOpacity,
+            transform: [{ translateY: animatedTranslateY }],
+            pointerEvents: mapIsInteracting ? 'none' : 'auto',
+          },
+        ]}
+      >
+        {!mapIsInteracting && (
+          <>
+            <Text style={styles.availableTitle}>
+              Available Equipment Near You
             </Text>
-          </View>
+            <Text style={styles.availableDescription}>
+              Explore a wide range of agricultural machinery available for rent
+              in your vicinity.
+            </Text>
+            {filteredNearbyEquipment.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.availableListContent}
+              >
+                {filteredNearbyEquipment.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.equipmentCard}
+                    onPress={() => {
+                      router.push(`/equipment/${item.id}`);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={{ uri: item.image }}
+                      style={styles.equipmentImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.equipmentDetails}>
+                      <Text style={styles.equipmentName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <Text style={styles.equipmentType}>{item.type}</Text>
+                      <Text style={styles.equipmentPrice}>
+                        ${item.rentalPrice?.toFixed(0)}
+                        <Text style={styles.equipmentPriceUnit}>/day</Text>
+                      </Text>
+                      <View style={styles.cardActions}>
+                        <TouchableOpacity style={styles.bookNowButton}>
+                          <Text style={styles.bookNowButtonText}>Book Now</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.detailsButton}
+                          onPress={() => router.push(`/equipment/${item.id}`)}
+                        >
+                          <Text style={styles.detailsButtonText}>Details</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <Text style={styles.emptyStateTitle}>No equipment found</Text>
+                <Text style={styles.emptyStateText}>
+                  Try adjusting your search criteria or check back later.
+                </Text>
+              </View>
+            )}
+          </>
         )}
-      </View>
+      </Animated.View>
 
-      {/* Filter Modal */}
       <FilterModal
         visible={isFilterModalVisible}
         onClose={() => setIsFilterModalVisible(false)}
@@ -471,102 +516,74 @@ export default function Discover() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: APP_BACKGROUND_COLOR,
+    backgroundColor: BACKGROUND_LIGHT_GREY,
   },
   map: {
     width: '100%',
     height: '100%',
   },
-  // --- Header styles matching Dashboard but with modifications ---
   headerContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: APP_BACKGROUND_COLOR, // Changed from MAIN_COLOR to match background
-    paddingHorizontal: 20,
-    paddingTop: 40, // Reduced padding
-    paddingBottom: 20, // Reduced padding
-    borderBottomLeftRadius: 10, // Removed bottom radius for a cleaner look
-    borderBottomRightRadius: 10, // Removed bottom radius
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 }, // Reduced shadow
-    shadowOpacity: 0.1, // Reduced shadow
-    shadowRadius: 3, // Reduced shadow
-    elevation: 4, // Reduced shadow
+    backgroundColor: 'transparent',
+    paddingTop: Platform.OS === 'android' ? 40 : 20,
+    paddingHorizontal: 18,
+    paddingBottom: 10,
     zIndex: 10,
   },
-  headerTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between', // Keep space-between, will auto-adjust with notification removal
-    alignItems: 'center',
-    marginBottom: 0, // Reduced margin
-  },
-  menuButton: {
-    width: 38, // Reduced size
-    height: 38, // Reduced size
-    borderRadius: BORDER_RADIUS,
-    backgroundColor: VERY_LIGHT_GREEN_TINT, // Changed background to match filter button
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000', // Added subtle shadow
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  searchSection: {
-    flex: 1,
+  searchAndFilterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: BORDER_RADIUS,
-    paddingHorizontal: 15,
-    height: 45, // Reduced height
+    justifyContent: 'space-between',
+    backgroundColor: MAIN_COLOR,
+    borderRadius: BORDER_RADIUS * 2,
+    padding: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 }, // Reduced shadow
-    shadowOpacity: 0.1, // Reduced shadow
-    shadowRadius: 4, // Reduced shadow
-    elevation: 4, // Reduced shadow
-    marginHorizontal: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 4,
   },
   searchInputWrapper: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
+    paddingHorizontal: 14,
+    height: 48,
+    marginRight: 12,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 12,
   },
   searchInput: {
     fontFamily: 'Archivo-Regular',
     flex: 1,
     height: '100%',
-    fontSize: 15, // Slightly reduced font size
+    fontSize: 16,
     color: TEXT_PRIMARY_DARK,
     paddingVertical: 0,
   },
   filterButton: {
-    width: 38, // Reduced size
-    height: 38, // Reduced size
-    borderRadius: BORDER_RADIUS, // Adjusted for new size
+    width: 48,
+    height: 48,
+    borderRadius: BORDER_RADIUS,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 10,
-    backgroundColor: VERY_LIGHT_GREEN_TINT,
+    backgroundColor: CARD_BACKGROUND,
   },
-  // Removed notificationButton and notificationBadge styles
-  // --- End Header styles ---
-
-  // Callout styles (unchanged, but using new color constants)
   calloutContainer: {
     width: 150,
     padding: 10,
     borderRadius: BORDER_RADIUS,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: CARD_BACKGROUND,
     alignItems: 'center',
     justifyContent: 'center',
+    borderColor: BORDER_GREY,
+    borderWidth: 1,
   },
   calloutTitle: {
     fontFamily: 'Archivo-Bold',
@@ -596,14 +613,12 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
     marginTop: 5,
   },
-
-  // Carousel styles (Adjusted for consistency)
   availableEquipmentContainer: {
     position: 'absolute',
-    bottom: 75,
+    bottom: 0,
     width: '100%',
-    paddingBottom: 20,
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingBottom: Platform.OS === 'ios' ? 100 : 80,
+    backgroundColor: BACKGROUND_LIGHT_GREY,
     borderTopLeftRadius: BORDER_RADIUS * 2,
     borderTopRightRadius: BORDER_RADIUS * 2,
     shadowColor: '#000',
@@ -611,50 +626,62 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 5,
     elevation: 5,
+    overflow: 'hidden',
   },
   availableTitle: {
     fontFamily: 'Archivo-Bold',
     fontSize: 20,
     color: TEXT_PRIMARY_DARK,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    marginBottom: 15,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    marginBottom: 4,
+  },
+  availableDescription: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 14,
+    color: TEXT_SECONDARY_GREY,
+    paddingHorizontal: 18,
+    marginBottom: 16,
+    lineHeight: 20,
   },
   availableListContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingBottom: 10,
-    gap: 15,
+    gap: 14,
   },
   equipmentCard: {
     width: 220,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: CARD_BACKGROUND,
     borderRadius: BORDER_RADIUS,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowRadius: 2,
+    elevation: 2,
   },
   equipmentImage: {
     width: '100%',
     height: 120,
     resizeMode: 'cover',
+    backgroundColor: LIGHT_GREEN_BACKGROUND,
   },
   equipmentDetails: {
     padding: 12,
   },
   equipmentName: {
-    fontFamily: 'Archivo-SemiBold',
-    fontSize: 16,
+    fontFamily: 'Archivo-Bold',
+    fontSize: 15,
     color: TEXT_PRIMARY_DARK,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   equipmentType: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 13,
+    fontSize: 12,
     color: TEXT_SECONDARY_GREY,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   equipmentPrice: {
     fontFamily: 'Archivo-Bold',
@@ -674,33 +701,34 @@ const styles = StyleSheet.create({
   },
   bookNowButton: {
     flex: 1,
-    backgroundColor: LIGHT_GREEN_TINT,
-    borderRadius: BORDER_RADIUS - 4,
+    backgroundColor: MAIN_COLOR,
+    borderRadius: BORDER_RADIUS - 2,
     paddingVertical: 10,
     marginRight: 5,
     justifyContent: 'center',
     alignItems: 'center',
   },
   bookNowButtonText: {
-    fontFamily: 'Archivo-Bold',
+    fontFamily: 'Archivo-Medium',
     fontSize: 13,
-    color: MAIN_COLOR,
+    color: HEADER_TEXT_COLOR,
   },
   detailsButton: {
     flex: 1,
-    backgroundColor: MAIN_COLOR,
-    borderRadius: BORDER_RADIUS - 4,
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS - 2,
     paddingVertical: 10,
     marginLeft: 5,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: MAIN_COLOR,
   },
   detailsButtonText: {
-    fontFamily: 'Archivo-Bold',
+    fontFamily: 'Archivo-Medium',
     fontSize: 13,
-    color: '#FFFFFF',
+    color: MAIN_COLOR,
   },
-  // Empty state styles matching Dashboard
   emptyStateContainer: {
     justifyContent: 'center',
     alignItems: 'center',

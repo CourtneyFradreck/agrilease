@@ -1,94 +1,120 @@
 import { Tabs } from 'expo-router';
 import {
-  Entypo,
-  FontAwesome,
   AntDesign,
   Feather,
-  Ionicons, // Ensure Ionicons is imported for the new tab icon
+  Ionicons,
+  MaterialCommunityIcons,
 } from '@expo/vector-icons';
+import { StyleSheet, Platform } from 'react-native';
+
+const MAIN_COLOR = '#4D7C0F';
+const TEXT_PRIMARY_DARK = '#1F2937';
+const TEXT_SECONDARY_GREY = '#6B7280';
+const BACKGROUND_LIGHT_GREY = '#F9FAFB';
+const CARD_BACKGROUND = '#FFFFFF';
+const BORDER_GREY = '#E5E5E5';
+const BORDER_RADIUS = 8;
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#4D7C0F', // Your main green color
-        tabBarInactiveTintColor: '#6B7280', // Consistent inactive grey
+        tabBarActiveTintColor: MAIN_COLOR,
+        tabBarInactiveTintColor: TEXT_SECONDARY_GREY,
         tabBarLabelStyle: {
-          fontFamily: 'Archivo-Medium', // Changed to Archivo-Medium
-          fontSize: 12,
-          paddingBottom: 2, // Slight adjustment for spacing
+          fontFamily: 'Archivo-Medium',
+          fontSize: 11,
+          paddingBottom: Platform.OS === 'ios' ? 0 : 2,
         },
         tabBarStyle: {
-          borderTopWidth: 0, // Removed default border
-          height: 75, // Increased height for a more substantial look
-          paddingVertical: 10, // Explicit vertical padding
-          backgroundColor: '#FFFFFF', // Clean white background for the tab bar
-          // Enhanced subtle shadow for an elevated effect
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 }, // More pronounced shadow from top
-          shadowOpacity: 0.1, // Increased opacity for visibility
-          shadowRadius: 8, // Increased radius for softer shadow
-          elevation: 8, // Android shadow matching iOS
-          borderTopLeftRadius: 20, // Rounded top corners
-          borderTopRightRadius: 20, // Rounded top corners
-          position: 'absolute', // Ensures shadow is visible on top of content
+          borderTopWidth: 1,
+          borderTopColor: BORDER_GREY,
+          height: Platform.OS === 'ios' ? 70 : 65,
+          paddingVertical: 10,
+          backgroundColor: CARD_BACKGROUND,
+          shadowColor: 'transparent',
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0,
+          elevation: 0,
+          position: 'absolute',
           left: 0,
           right: 0,
-          bottom: 0, // Pin to bottom
+          bottom: 0,
         },
         headerStyle: {
-          backgroundColor: '#F9FAFB', // Consistent with your app's main background color
-          borderBottomWidth: 0, // Remove any header border if present
-          shadowOpacity: 0, // Remove header shadow on iOS
-          elevation: 0, // Remove header shadow on Android
+          backgroundColor: BACKGROUND_LIGHT_GREY,
+          borderBottomWidth: 0,
+          shadowOpacity: 0,
+          elevation: 0,
         },
         headerTitleStyle: {
-          fontFamily: 'Archivo-Bold', // Changed to Archivo-Bold
+          fontFamily: 'Archivo-Bold',
           fontSize: 18,
-          color: '#1F2937', // Darker text for consistency with your app's primary text
+          color: TEXT_PRIMARY_DARK,
         },
+        tabBarHideOnKeyboard: true,
       }}
     >
       <Tabs.Screen
-        name="index" // Corresponds to Dashboard.tsx
+        name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Entypo name="home" color={color} size={size} />
+          title: 'Market',
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons
+              name="storefront-outline"
+              color={color}
+              size={24}
+            />
           ),
-          headerTitle: 'AgriLease Dashboard',
-          headerShown: false, // Keep this false as your Dashboard handles its own header
+          headerTitle: 'AgriLease Marketplace',
+          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="discover"
         options={{
-          title: 'Discover',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map-outline" color={color} size={size} />
+          title: 'Explore',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="compass-outline" color={color} size={24} />
           ),
-          headerTitle: 'Discover Equipment',
-          headerShown: false, // Discover screen also has its own custom header
+          headerTitle: 'Explore Equipment',
+          headerShown: false,
         }}
       />
+
       <Tabs.Screen
         name="add"
         options={{
-          title: 'Add Listing',
-          tabBarIcon: ({ color, size }) => (
-            <AntDesign name="pluscircle" color={color} size={size} />
+          title: 'List Item',
+          tabBarIcon: ({ color }) => (
+            <AntDesign name="pluscircleo" color={color} size={24} />
           ),
-          headerTitle: 'Add New Listing',
+          headerTitle: 'List New Item',
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Messages',
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons
+              name="message-text-outline"
+              color={color}
+              size={24}
+            />
+          ),
+          headerTitle: 'My Messages',
+          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="user" color={color} size={size} />
+          title: 'Account',
+          tabBarIcon: ({ color }) => (
+            <Feather name="user" color={color} size={24} />
           ),
-          headerTitle: 'My Profile',
+          headerTitle: 'My Account',
         }}
       />
     </Tabs>
