@@ -1,49 +1,101 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { useFonts, Inter_400Regular, Inter_500Medium, Inter_700Bold } from '@expo-google-fonts/inter';
+
+import {
+  useFonts,
+  Archivo_400Regular,
+  Archivo_500Medium,
+  Archivo_600SemiBold,
+  Archivo_700Bold,
+} from '@expo-google-fonts/archivo';
+
+import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '@/context/AuthContext';
 import { DataProvider } from '@/context/DataContext';
-import SplashScreen from '@/components/SplashScreen';
+import { Platform } from 'react-native';
 
-export default function RootLayout() {  
+if (Platform.OS !== 'web') {
+  SplashScreen.preventAutoHideAsync().catch(() => {});
+}
+
+export default function RootLayout() {
   useFrameworkReady();
 
   const [splashComplete, setSplashComplete] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
-    'Inter-Regular': Inter_400Regular,
-    'Inter-Medium': Inter_500Medium,
-    'Inter-Bold': Inter_700Bold,
+    'Archivo-Regular': Archivo_400Regular,
+    'Archivo-Medium': Archivo_500Medium,
+    'Archivo-SemiBold': Archivo_600SemiBold,
+    'Archivo-Bold': Archivo_700Bold,
   });
 
-  if (!fontsLoaded || !splashComplete) {
-    return <SplashScreen onComplete={() => setSplashComplete(true)} />;
+  useEffect(() => {
+    const hideSplash = async () => {
+      try {
+        if (Platform.OS !== 'web' && (fontsLoaded || fontError)) {
+          await SplashScreen.hideAsync();
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    };
+
+    hideSplash();
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
   }
 
   return (
     <AuthProvider>
       <DataProvider>
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack>
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="equipment/[id]" options={{ 
-            headerShown: true, 
-            headerTitle: 'Equipment Details',
-            headerBackTitle: 'Back',
-            headerTintColor: '#4D7C0F',
-            headerStyle: { backgroundColor: '#F5F5F5' },
-          }} />
-          <Stack.Screen name="booking/[id]" options={{ 
-            headerShown: true, 
-            headerTitle: 'Request Booking',
-            headerBackTitle: 'Back',
-            headerTintColor: '#4D7C0F',
-            headerStyle: { backgroundColor: '#F5F5F5' },
-          }} />
+          <Stack.Screen
+            name="equipment/[id]"
+            options={{
+              headerShown: false,
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="booking/[id]"
+            options={{
+              headerShown: false,
+              headerTitle: 'Request Booking',
+              headerTintColor: '#1F2937',
+              headerStyle: {
+                backgroundColor: '#FFFFFF',
+              },
+              headerTitleStyle: {
+                fontFamily: 'Archivo-SemiBold',
+                fontSize: 18,
+              },
+            }}
+          />
+          <Stack.Screen
+            name="messages/[id]"
+            options={{
+              headerShown: false,
+              headerTitle: 'Messages',
+              headerTintColor: '#1F2937',
+              headerStyle: {
+                backgroundColor: '#FFFFFF',
+              },
+              headerTitleStyle: {
+                fontFamily: 'Archivo-SemiBold',
+                fontSize: 18,
+              },
+            }}
+          />
           <Stack.Screen name="+not-found" options={{ headerShown: false }} />
         </Stack>
-        <StatusBar style="auto" />
+        <StatusBar style="dark" />
       </DataProvider>
     </AuthProvider>
   );
