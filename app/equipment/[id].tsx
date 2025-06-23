@@ -1,31 +1,54 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  ScrollView,
+  Alert,
+  TouchableOpacity,
+  Platform,
+  SafeAreaView,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { MapPin, PenTool as Tool, User, Calendar, Clock, ArrowRight } from 'lucide-react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useData } from '@/context/DataContext';
 import { Button } from '@/components/Button';
+
+const BORDER_RADIUS = 8;
+const MAIN_COLOR = '#4D7C0F';
+const HEADER_TEXT_COLOR = '#FFFFFF';
+const TEXT_PRIMARY_DARK = '#1F2937';
+const TEXT_SECONDARY_GREY = '#6B7280';
+const BACKGROUND_LIGHT_GREY = '#F9FAFB';
+const CARD_BACKGROUND = '#FFFFFF';
+const BORDER_GREY = '#E5E5E5';
+const ERROR_RED = '#DC2626';
 
 export default function EquipmentDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { getRentalEquipmentById } = useData();
-  
-  // Get equipment details from context
+
   const equipment = getRentalEquipmentById(id);
-  
+
   if (!equipment) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Equipment not found</Text>
-        <Button onPress={() => router.back()} text="Go Back" style={styles.goBackButton} />
+        <Button
+          onPress={() => router.back()}
+          text="Go Back"
+          style={styles.goBackButton}
+        />
       </View>
     );
   }
-  
+
   const handleBookingRequest = () => {
+    console.log(`/booking/${id}`);
     router.push(`/booking/${id}`);
   };
-  
+
   const handleContactOwner = () => {
     Alert.alert(
       'Contact Owner',
@@ -33,265 +56,365 @@ export default function EquipmentDetails() {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Call Owner', onPress: () => console.log('Call owner') },
-        { text: 'Message Owner', onPress: () => console.log('Message owner') }
-      ]
+        { text: 'Message Owner', onPress: () => console.log('Message owner') },
+      ],
     );
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Image 
-        source={{ uri: equipment.image }}
-        style={styles.image}
-        resizeMode="cover"
-      />
-      
-      <View style={styles.contentContainer}>
-        <Text style={styles.name}>{equipment.name}</Text>
-        
-        <View style={styles.infoRow}>
-          <View style={styles.infoItem}>
-            <Tool size={20} color="#6B7280" />
-            <Text style={styles.infoText}>{equipment.type}</Text>
-          </View>
-          
-          <View style={styles.infoItem}>
-            <MapPin size={20} color="#6B7280" />
-            <Text style={styles.infoText}>{equipment.location}</Text>
-          </View>
+    <View style={styles.container}>
+      <SafeAreaView style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityLabel="Go back to previous screen"
+        >
+          <MaterialIcons
+            name="arrow-back"
+            size={24}
+            color={HEADER_TEXT_COLOR}
+          />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Equipment Details</Text>
+        <View style={{ width: 24 }} />
+      </SafeAreaView>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: equipment.image }}
+            style={styles.image}
+            resizeMode="cover"
+          />
         </View>
-        
-        <View style={styles.priceContainer}>
-          <Text style={styles.priceLabel}>Rental Price</Text>
-          <Text style={styles.price}>${equipment.rentalPrice?.toFixed(2)}</Text>
-          <Text style={styles.priceUnit}>per day</Text>
-        </View>
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Description</Text>
-          <Text style={styles.description}>{equipment.description}</Text>
-        </View>
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Availability</Text>
-          <View style={styles.availabilityContainer}>
-            <View style={styles.availabilityItem}>
-              <Calendar size={18} color="#4D7C0F" />
-              <Text style={styles.availabilityText}>Available Now</Text>
-            </View>
-            
-            <View style={styles.availabilityItem}>
-              <Clock size={18} color="#4D7C0F" />
-              <Text style={styles.availabilityText}>Minimum 1 day rental</Text>
-            </View>
-          </View>
-        </View>
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Owner</Text>
-          <View style={styles.ownerContainer}>
-            <Image 
-              source={{ uri: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg' }}
-              style={styles.ownerImage}
-            />
-            
-            <View style={styles.ownerInfo}>
-              <Text style={styles.ownerName}>{equipment.owner?.name || 'Equipment Owner'}</Text>
-              <Text style={styles.ownerLocation}>{equipment.location}</Text>
-              
-              <View style={styles.ownerRating}>
-                {Array(5).fill(0).map((_, i) => (
-                  <Text key={i} style={styles.starIcon}>★</Text>
-                ))}
-                <Text style={styles.ratingText}>4.8 (24 reviews)</Text>
+
+        <View style={styles.contentCard}>
+          <Text style={styles.name}>{equipment.name}</Text>
+          <Text style={styles.carRating}>Equipment Rating: 92/100</Text>
+
+          <View style={styles.section}>
+            <View style={styles.ownerInfoContent}>
+              <Image
+                source={{
+                  uri: 'https://www.courtney.codes/assets/images/courtney.jpg',
+                }}
+                style={styles.ownerImage}
+              />
+              <View style={styles.ownerDetails}>
+                <Text style={styles.ownerName}>
+                  {equipment.owner?.name || 'Equipment Owner'}
+                </Text>
+                <View style={styles.ownerRating}>
+                  <Text style={styles.starIcon}>★</Text>
+                  <Text style={styles.ratingText}>5.0 • 14 reviews</Text>
+                </View>
               </View>
+              <TouchableOpacity onPress={handleContactOwner}>
+                <Text style={styles.contactOwnerText}>Contact Owner</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>Technical specifications</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.specsContainer}
+          >
+            <View style={styles.specItem}>
+              <Text style={styles.specValue}>610 hp.</Text>
+              <Text style={styles.specLabel}>Engine</Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={styles.specValue}>3.2 s</Text>
+              <Text style={styles.specLabel}>0-100 km/h</Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={styles.specValue}>All-wheel</Text>
+              <Text style={styles.specLabel}>Drive</Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={styles.specValue}>Automatic</Text>
+              <Text style={styles.specLabel}>Transmission</Text>
+            </View>
+          </ScrollView>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.description}>{equipment.description}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Availability</Text>
+            <View style={styles.availabilityList}>
+              <Text style={styles.availabilityBullet}>
+                • Available Now for immediate rental.
+              </Text>
+              <Text style={styles.availabilityBullet}>
+                • Minimum 1 day rental period required.
+              </Text>
             </View>
           </View>
         </View>
-      </View>
-      
-      <View style={styles.buttonsContainer}>
-        <Button 
-          onPress={handleContactOwner}
-          text="Contact Owner"
-          variant="secondary"
-          style={styles.contactButton}
-        />
-        
-        <Button 
+      </ScrollView>
+
+      <View style={styles.bottomBar}>
+        <View style={styles.priceFooter}>
+          <Text style={styles.priceFrom_bottomBar}>from</Text>
+          <Text style={styles.price_bottomBar}>
+            ${equipment.rentalPrice?.toFixed(2)}
+          </Text>
+          <Text style={styles.priceUnit_bottomBar}> / day</Text>
+        </View>
+        <Button
           onPress={handleBookingRequest}
-          text="Request Booking"
-          icon={<ArrowRight size={20} color="#FFFFFF" />}
-          style={styles.bookButton}
+          text="Book Now"
+          style={styles.bookNowButton}
+          textStyle={styles.bookNowButtonText}
         />
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: BACKGROUND_LIGHT_GREY,
   },
-  image: {
-    width: '100%',
-    height: 250,
+  scrollContent: {
+    paddingBottom: 90,
   },
-  contentContainer: {
-    padding: 16,
-  },
-  name: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 24,
-    color: '#333333',
-    marginBottom: 8,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  infoItem: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 35 : 45,
+    paddingBottom: 10,
+    backgroundColor: MAIN_COLOR,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
-  infoText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#6B7280',
-    marginLeft: 4,
-  },
-  priceContainer: {
-    backgroundColor: '#F0FDF4',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  priceLabel: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 14,
-    color: '#4D7C0F',
-    marginRight: 8,
-  },
-  price: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 24,
-    color: '#4D7C0F',
-  },
-  priceUnit: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#4D7C0F',
-    marginLeft: 4,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter-Bold',
+  headerTitle: {
+    fontFamily: 'Archivo-Bold',
     fontSize: 18,
-    color: '#333333',
-    marginBottom: 8,
+    color: HEADER_TEXT_COLOR,
   },
-  description: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: '#4B5563',
-    lineHeight: 24,
-  },
-  availabilityContainer: {
-    backgroundColor: '#F9FAFB',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-  },
-  availabilityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  availabilityText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    color: '#4B5563',
-    marginLeft: 8,
-  },
-  ownerContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F9FAFB',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-  },
-  ownerImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 16,
-  },
-  ownerInfo: {
-    flex: 1,
-  },
-  ownerName: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 18,
-    color: '#333333',
-    marginBottom: 4,
-  },
-  ownerLocation: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  ownerRating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  starIcon: {
-    color: '#F59E0B',
-    fontSize: 16,
-    marginRight: 2,
-  },
-  ratingText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#6B7280',
-    marginLeft: 4,
-  },
-  buttonsContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
-    backgroundColor: '#FFFFFF',
-  },
-  contactButton: {
-    flex: 1,
-    marginRight: 8,
-  },
-  bookButton: {
-    flex: 1,
-    marginLeft: 8,
+  backButton: {
+    padding: 6,
+    backgroundColor: 'transparent',
+    borderRadius: 0,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+    backgroundColor: BACKGROUND_LIGHT_GREY,
   },
   errorText: {
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'Archivo-Bold',
     fontSize: 18,
-    color: '#DC2626',
+    color: ERROR_RED,
     marginBottom: 16,
   },
   goBackButton: {
-    width: 150,
+    width: 140,
+  },
+  imageContainer: {
+    width: '100%',
+    height: 250,
+    marginTop: Platform.OS === 'android' ? 35 + 10 : 45 + 10,
+    zIndex: -1,
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  contentCard: {
+    backgroundColor: BACKGROUND_LIGHT_GREY,
+    borderTopLeftRadius: BORDER_RADIUS,
+    borderTopRightRadius: BORDER_RADIUS,
+    marginTop: -BORDER_RADIUS,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: BORDER_GREY,
+  },
+  name: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 20,
+    color: TEXT_PRIMARY_DARK,
+    marginBottom: 4,
+  },
+  carRating: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 14,
+    color: TEXT_SECONDARY_GREY,
+    marginBottom: 20,
+  },
+  ownerInfoContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 0,
+    paddingVertical: 0,
+    borderColor: 'transparent',
+  },
+  ownerImage: {
+    width: 45,
+    height: 45,
+    borderRadius: 10.5,
+    marginRight: 12,
+  },
+  ownerDetails: {
+    flex: 1,
+  },
+  ownerName: {
+    fontFamily: 'Archivo-Medium',
+    fontSize: 16,
+    color: TEXT_PRIMARY_DARK,
+  },
+  ownerRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  starIcon: {
+    color: '#F59E0B',
+    fontSize: 14,
+    marginRight: 2,
+  },
+  ratingText: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 13,
+    color: TEXT_SECONDARY_GREY,
+  },
+  contactOwnerText: {
+    fontFamily: 'Archivo-Medium',
+    fontSize: 14,
+    color: MAIN_COLOR,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  sectionTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 16,
+    color: TEXT_PRIMARY_DARK,
+    marginBottom: 10,
+    marginTop: 0,
+  },
+  specsContainer: {
+    flexDirection: 'row',
+    paddingVertical: 6,
+    marginBottom: 20,
+    paddingHorizontal: 18,
+  },
+  specItem: {
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+  },
+  specValue: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 15,
+    color: TEXT_PRIMARY_DARK,
+    marginBottom: 2,
+  },
+  specLabel: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 12,
+    color: TEXT_SECONDARY_GREY,
+  },
+  section: {
+    marginBottom: 16,
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+    padding: 12,
+  },
+  description: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 15,
+    color: TEXT_SECONDARY_GREY,
+    lineHeight: 22,
+  },
+  availabilityList: {
+    marginTop: 10,
+    paddingHorizontal: 0,
+  },
+  availabilityBullet: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 14,
+    color: TEXT_PRIMARY_DARK,
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: MAIN_COLOR,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderTopLeftRadius: BORDER_RADIUS * 2,
+    borderTopRightRadius: BORDER_RADIUS * 2,
+    borderTopWidth: 1,
+    borderColor: MAIN_COLOR,
+  },
+  priceFooter: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  priceFrom_bottomBar: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 13,
+    color: HEADER_TEXT_COLOR,
+    marginRight: 3,
+  },
+  price_bottomBar: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 24,
+    color: HEADER_TEXT_COLOR,
+  },
+  priceUnit_bottomBar: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 13,
+    color: HEADER_TEXT_COLOR,
+    marginLeft: 2,
+  },
+  bookNowButton: {
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    minWidth: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: CARD_BACKGROUND,
+  },
+  bookNowButtonText: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 16,
+    color: MAIN_COLOR,
   },
 });

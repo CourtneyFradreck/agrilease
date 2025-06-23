@@ -1,15 +1,25 @@
 {
   "expo": {
-    "name": "bolt-expo-nativewind",
-    "slug": "bolt-expo-nativewind",
+    "name": "agrilease",
+    "slug": "agrilease",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/favicon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#27ae60"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.courtneycodes.agrileaseapp",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs your location to show nearby equipment and clients.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs your location to show nearby equipment and clients, even when in the background."
+      }
     },
     "web": {
       "bundler": "metro",
@@ -18,10 +28,34 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow AgriLease to use your location."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "41ce8485-7ad1-4785-90bb-0180a1d5f303"
+      }
+    },
+    "android": {
+      "package": "com.courtneycodes.agrileaseapp",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_Maps_API_KEY"
+        }
+      }
     }
   }
 }

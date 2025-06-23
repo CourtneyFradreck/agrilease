@@ -1,0 +1,38 @@
+name: Validate Expo App
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  expo-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Expo CLI
+        run: npm install -g expo-cli
+
+      - name: Install Expo-managed dependencies
+        run: npx expo install
+
+      - name: Validate with expo doctor
+        run: npx expo-doctor
+
+      - name: Check prebuild status
+        run: expo prebuild --no-install --platform android
