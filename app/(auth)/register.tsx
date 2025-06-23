@@ -69,7 +69,7 @@ export default function Register() {
     let isValid = true;
 
     if (currentStep === 0) {
-      if (!name || !email || !phone) {
+      if (!fullname || !email || !phone) {
         setError('All personal information fields are required.');
         isValid = false;
       }
@@ -113,8 +113,8 @@ export default function Register() {
                 style={styles.input}
                 placeholder="Your full name"
                 placeholderTextColor={TEXT_SECONDARY_GREY}
-                value={name}
-                onChangeText={setName}
+                value={fullname}
+                onChangeText={setFullName}
               />
             </View>
 
