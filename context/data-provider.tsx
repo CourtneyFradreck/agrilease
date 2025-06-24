@@ -121,7 +121,7 @@ export function DataProvider({ children }: DataProviderProps) {
             price: typeof data.price === "number" ? data.price : Number.parseFloat(data.price),
             location: data.location,
 
-            // Support both old and new image fields
+        
             image: data.mainImage || data.image, // Use Firebase Storage URL if available
             mainImage: data.mainImage, // Firebase Storage URL
             mainImagePath: data.mainImagePath, // Firebase Storage path
