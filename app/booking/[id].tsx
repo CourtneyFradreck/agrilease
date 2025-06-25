@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
-  Text,
+  Text, // Ensure Text is imported
   StyleSheet,
   ScrollView,
   Alert,
@@ -9,13 +9,12 @@ import {
   TouchableOpacity,
   Modal,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useData } from '@/context/DataContext';
 import { Button } from '@/components/Button';
 import dayjs from 'dayjs';
-
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 
@@ -23,6 +22,17 @@ dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
 
 import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { db } from '@/FirebaseConfig';
+import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+
+import {
+  EquipmentSchema,
+  ListingSchema,
+  UserSchema,
+  BookingSchema,
+} from '@/utils/validators';
+import { z } from 'zod';
 
 interface DayPressEvent {
   dateString: string;
@@ -31,6 +41,12 @@ interface DayPressEvent {
   year: number;
   timestamp: number;
 }
+
+// Define specific types from Zod schemas for clarity
+type Equipment = z.infer<typeof EquipmentSchema>;
+type Listing = z.infer<typeof ListingSchema>;
+type UserProfile = z.infer<typeof UserSchema>;
+type Booking = z.infer<typeof BookingSchema>;
 
 LocaleConfig.locales['en'] = {
   monthNames: [
@@ -88,28 +104,75 @@ const CALENDAR_RANGE_BG = '#D4EDD4';
 const ERROR_RED = '#DC2626';
 
 export default function BookingPage() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: listingId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getRentalEquipmentById, createBooking } = useData();
+  const auth = getAuth();
+  const currentUserId = auth.currentUser?.uid;
 
-  const equipment = getRentalEquipmentById(id);
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [equipment, setEquipment] = useState<Equipment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
 
-  if (!equipment) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Equipment not found</Text>
-        <Button
-          onPress={() => router.back()}
-          text="Go Back"
-          style={styles.goBackButton}
-        />
-      </View>
-    );
-  }
+  useEffect(() => {
+    const fetchListingAndEquipment = async () => {
+      if (!listingId) {
+        setError('Listing ID is missing.');
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      try {
+        const listingDocRef = doc(db, 'listings', listingId);
+        const listingSnap = await getDoc(listingDocRef);
+
+        if (!listingSnap.exists()) {
+          setError('Listing not found.');
+          setLoading(false);
+          return;
+        }
+        const parsedListing = ListingSchema.parse({
+          ...listingSnap.data(),
+          id: listingSnap.id,
+        });
+        setListing(parsedListing);
+
+        const equipmentDocRef = doc(db, 'equipment', parsedListing.equipmentId);
+        const equipmentSnap = await getDoc(equipmentDocRef);
+
+        if (!equipmentSnap.exists()) {
+          setError('Associated equipment not found.');
+          setLoading(false);
+          return;
+        }
+        const parsedEquipment = EquipmentSchema.parse({
+          ...equipmentSnap.data(),
+          id: equipmentSnap.id,
+        });
+        setEquipment(parsedEquipment);
+      } catch (e) {
+        console.error('Error fetching listing or equipment: ', e);
+        if (e instanceof z.ZodError) {
+          setError(
+            `Data validation error: ${e.errors.map((err) => err.message).join(', ')}`,
+          );
+        } else {
+          setError('Failed to load listing details. Please try again.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchListingAndEquipment();
+  }, [listingId]);
 
   const handleDayPress = useCallback(
     (day: DayPressEvent) => {
@@ -140,14 +203,25 @@ export default function BookingPage() {
     return 0;
   }, [startDate, endDate]);
 
-  const totalPrice = rentalDays * (equipment.rentalPrice || 0);
+  const totalPrice = rentalDays * (listing?.price || 0);
 
   const handleSubmitRequest = async () => {
+    if (!currentUserId) {
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to make a booking.',
+      );
+      router.replace('/login');
+      return;
+    }
+    if (!listing || !equipment) {
+      Alert.alert('Error', 'Listing or equipment data is missing.');
+      return;
+    }
     if (!startDate || !endDate) {
       Alert.alert('Missing Dates', 'Please select both start and end dates.');
       return;
     }
-
     if (dayjs(endDate).isBefore(dayjs(startDate), 'day')) {
       Alert.alert(
         'Invalid Dates',
@@ -156,13 +230,23 @@ export default function BookingPage() {
       return;
     }
 
+    setIsSubmittingBooking(true);
     try {
-      await createBooking({
-        equipmentId: equipment.id,
-        startDate,
-        endDate,
-        totalPrice,
-      });
+      const bookingData: Omit<z.infer<typeof BookingSchema>, 'id'> = {
+        equipmentId: equipment.id as string,
+        listingId: listing.id as string,
+        renterId: currentUserId,
+        ownerId: listing.ownerId,
+        startDate: startDate.getTime(),
+        endDate: endDate.getTime(),
+        totalPrice: parseFloat(totalPrice.toFixed(2)),
+        bookingDate: Date.now(),
+        status: 'pending',
+      };
+
+      BookingSchema.parse(bookingData);
+
+      await addDoc(collection(db, 'bookings'), bookingData);
 
       Alert.alert(
         'Booking Request Sent',
@@ -174,17 +258,27 @@ export default function BookingPage() {
           },
         ],
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create booking:', error);
-      Alert.alert(
-        'Booking Failed',
-        'There was an issue sending your booking request. Please try again.',
-        [{ text: 'OK' }],
-      );
+      if (error instanceof z.ZodError) {
+        Alert.alert(
+          'Validation Error',
+          `Booking data invalid: ${error.errors.map((err) => err.message).join(', ')}`,
+        );
+      } else {
+        Alert.alert(
+          'Booking Failed',
+          'There was an issue sending your booking request. Please try again.',
+          [{ text: 'OK' }],
+        );
+      }
+    } finally {
+      setIsSubmittingBooking(false);
     }
   };
 
-  const isSubmitDisabled = !startDate || !endDate || rentalDays <= 0;
+  const isSubmitDisabled =
+    !startDate || !endDate || rentalDays <= 0 || isSubmittingBooking;
 
   const markedDates = useMemo(() => {
     const dates: { [key: string]: any } = {};
@@ -255,7 +349,32 @@ export default function BookingPage() {
     return dates;
   }, [startDate, endDate]);
 
-  const { name, rentalPrice } = equipment;
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={MAIN_COLOR} />
+        <Text style={styles.loadingText}>Loading booking details...</Text>
+      </View>
+    );
+  }
+
+  if (error || !listing || !equipment) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>
+          {error || 'Booking details could not be loaded.'}
+        </Text>
+        <Button
+          onPress={() => router.back()}
+          text="Go Back"
+          style={styles.goBackButton}
+        />
+      </View>
+    );
+  }
+
+  const { name } = equipment;
+  const { price, rentalUnit } = listing;
 
   return (
     <View style={styles.fullScreenContainer}>
@@ -271,8 +390,14 @@ export default function BookingPage() {
             color={HEADER_TEXT_COLOR}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Confirm Booking</Text>
-        <View style={{ width: 24 }} />
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Confirm Booking</Text>
+          {/* Header description consistent with EquipmentDetails */}
+          <Text style={styles.headerDescription}>
+            Finalize your rental request
+          </Text>
+        </View>
+        <View style={{ width: 24 }} /> {/* Spacer to balance header */}
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -280,16 +405,18 @@ export default function BookingPage() {
           <Text style={styles.summaryTitle}>Requesting to Rent</Text>
           <Text style={styles.equipmentName}>{name}</Text>
           <Text style={styles.equipmentPrice}>
-            ${rentalPrice?.toFixed(2)} per day
+            ${price?.toFixed(2)} per {rentalUnit}
           </Text>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+        {/* Select Dates Section */}
+        <View style={styles.sectionContainer}>
+          {/* Renamed for consistency */}
+          <View style={styles.sectionTitleContainer}>
+            {/* Added for consistent title/subtitle group */}
             <MaterialIcons name="calendar-today" size={22} color={MAIN_COLOR} />
             <Text style={styles.sectionTitle}>Select Rental Dates</Text>
           </View>
-
           <TouchableOpacity
             style={styles.selectDatesButton}
             onPress={() => setIsCalendarVisible(true)}
@@ -316,14 +443,17 @@ export default function BookingPage() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Rental Summary</Text>
+        {/* Rental Summary Section */}
+        <View style={styles.sectionContainer}>
+          {/* Renamed for consistency */}
+          <View style={styles.sectionTitleContainer}>
+            {/* Added for consistent title/subtitle group */}
+            <Text style={styles.sectionTitle}>Rental Summary</Text>
+          </View>
           <View style={styles.summaryGrid}>
             <View style={styles.summaryGridItem}>
               <Text style={styles.summaryItemLabel}>Daily Rate</Text>
-              <Text style={styles.summaryItemValue}>
-                ${rentalPrice?.toFixed(2)}
-              </Text>
+              <Text style={styles.summaryItemValue}>${price?.toFixed(2)}</Text>
             </View>
             <View style={styles.summaryGridItem}>
               <Text style={styles.summaryItemLabel}>Rental Period</Text>
@@ -340,8 +470,13 @@ export default function BookingPage() {
           </View>
         </View>
 
-        <View style={styles.policySection}>
-          <Text style={styles.sectionTitle}>Booking Policies</Text>
+        {/* Booking Policies Section */}
+        <View style={styles.sectionContainer}>
+          {/* Renamed for consistency */}
+          <View style={styles.sectionTitleContainer}>
+            {/* Added for consistent title/subtitle group */}
+            <Text style={styles.sectionTitle}>Booking Policies</Text>
+          </View>
           <View style={styles.policyList}>
             <Text style={styles.policyBullet}>
               • Free cancellation up to 48 hours before pickup.
@@ -364,11 +499,10 @@ export default function BookingPage() {
         </View>
         <Button
           onPress={handleSubmitRequest}
-          text="Submit Request"
+          text={isSubmittingBooking ? 'Submitting...' : 'Submit Request'}
           style={styles.submitBookingButton}
           textStyle={styles.submitBookingButtonText}
           disabled={isSubmitDisabled}
-          accessibilityLabel="Submit booking request"
         />
       </View>
 
@@ -436,26 +570,62 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BACKGROUND_LIGHT_GREY,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: BACKGROUND_LIGHT_GREY,
+  },
+  loadingText: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 16,
+    color: TEXT_SECONDARY_GREY,
+    marginTop: 10,
+  },
   scrollContent: {
     paddingBottom: 100,
+    paddingTop: Platform.OS === 'android' ? 70 : 80,
+    marginTop: 30,
+    flexGrow: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-
     justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingTop: Platform.OS === 'android' ? 35 : 45,
+    paddingHorizontal: 16, // Consistent padding
+    paddingTop: 30, // Increased paddingTop for header
     paddingBottom: 10,
     backgroundColor: MAIN_COLOR,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    borderBottomWidth: 1, // Consistent border
+    borderBottomColor: 'rgba(255,255,255,0.2)',
   },
   backButton: {
-    padding: 5,
+    padding: 6, // Consistent padding
+  },
+  headerTitleContainer: {
+    // New style for consistency
+    flex: 1,
+    alignItems: 'flex-start',
+    marginLeft: 10,
   },
   headerTitle: {
     fontFamily: 'Archivo-Bold',
     fontSize: 18,
     color: HEADER_TEXT_COLOR,
+    textAlign: 'left',
+  },
+  headerDescription: {
+    // New style for consistency
+    fontFamily: 'Archivo-Regular',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'left',
+    marginTop: 2,
   },
   errorContainer: {
     flex: 1,
@@ -469,20 +639,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: ERROR_RED,
     marginBottom: 16,
+    textAlign: 'center',
   },
   goBackButton: {
     width: 150,
   },
-
   equipmentSummary: {
     backgroundColor: CARD_BACKGROUND,
-    padding: 16,
-    marginBottom: 16,
-    marginTop: 16,
+    padding: 18, // Consistent padding
+    marginBottom: 20, // Consistent spacing between sections
+    marginTop: 0, // No top margin here, handled by scrollContent paddingTop
     borderRadius: BORDER_RADIUS,
-    marginHorizontal: 15,
-    zIndex: 1,
-    borderWidth: 1,
+    marginHorizontal: 18, // Consistent horizontal margin
+    borderWidth: 1, // Consistent border
     borderColor: BORDER_GREY,
   },
   summaryTitle: {
@@ -490,37 +659,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: TEXT_SECONDARY_GREY,
     marginBottom: 4,
+    textAlign: 'left', // Ensure left alignment
   },
   equipmentName: {
     fontFamily: 'Archivo-Bold',
     fontSize: 20,
     color: TEXT_PRIMARY_DARK,
     marginBottom: 4,
+    textAlign: 'left', // Ensure left alignment
   },
   equipmentPrice: {
     fontFamily: 'Archivo-Medium',
     fontSize: 16,
     color: MAIN_COLOR,
+    textAlign: 'left', // Ensure left alignment
   },
-  section: {
-    backgroundColor: CARD_BACKGROUND,
-    padding: 16,
-    marginBottom: 16,
+  sectionContainer: {
+    // New style for all major sections for consistency
+    backgroundColor: CARD_BACKGROUND, // Card background
+    padding: 18, // Consistent padding
+    marginBottom: 20, // Space between sections
+    marginHorizontal: 18, // Consistent horizontal margin
     borderRadius: BORDER_RADIUS,
-    marginHorizontal: 15,
-    borderWidth: 1,
+    borderWidth: 1, // Consistent border
     borderColor: BORDER_GREY,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
+  sectionTitleContainer: {
+    flexDirection: 'row', // Added to align icon and text
+    alignItems: 'center', // Added to align icon and text
+    marginTop: 0, // No top margin within section card
+    marginBottom: 10, // Space below title/subtitle block
   },
   sectionTitle: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 16,
+    fontSize: 18, // Consistent font size
     color: TEXT_PRIMARY_DARK,
-    marginLeft: 8,
+    textAlign: 'left',
+    marginBottom: 4,
+    marginLeft: 8, // Add some space between icon and text
   },
   selectDatesButton: {
     flexDirection: 'row',
@@ -537,6 +713,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Medium',
     fontSize: 15,
     color: TEXT_PRIMARY_DARK,
+    textAlign: 'left', // Ensure left alignment
   },
   summaryGrid: {
     flexDirection: 'row',
@@ -547,23 +724,26 @@ const styles = StyleSheet.create({
   summaryGridItem: {
     width: '48%',
     backgroundColor: BACKGROUND_LIGHT_GREY,
-    borderRadius: BORDER_RADIUS,
+    borderRadius: BORDER_RADIUS, // Consistent border radius
     padding: 12,
     marginBottom: 10,
-    borderWidth: 1,
+    borderWidth: 1, // Consistent border
     borderColor: BORDER_GREY,
     justifyContent: 'space-between',
+    alignItems: 'flex-start', // Ensure left alignment
   },
   summaryItemLabel: {
     fontFamily: 'Archivo-Regular',
     fontSize: 13,
     color: TEXT_SECONDARY_GREY,
     marginBottom: 4,
+    textAlign: 'left', // Ensure left alignment
   },
   summaryItemValue: {
     fontFamily: 'Archivo-Medium',
     fontSize: 15,
     color: TEXT_PRIMARY_DARK,
+    textAlign: 'left', // Ensure left alignment
   },
   summaryTotalItem: {
     width: '100%',
@@ -571,25 +751,19 @@ const styles = StyleSheet.create({
     borderColor: MAIN_COLOR,
     borderWidth: 2,
     marginTop: 5,
+    alignItems: 'flex-start', // Ensure left alignment
   },
   summaryTotalLabel: {
     fontFamily: 'Archivo-Bold',
     fontSize: 16,
     color: TEXT_PRIMARY_DARK,
+    textAlign: 'left', // Ensure left alignment
   },
   summaryTotalValue: {
     fontFamily: 'Archivo-Bold',
     fontSize: 20,
     color: MAIN_COLOR,
-  },
-  policySection: {
-    backgroundColor: CARD_BACKGROUND,
-    padding: 16,
-    marginBottom: 16,
-    borderRadius: BORDER_RADIUS,
-    marginHorizontal: 15,
-    borderWidth: 1,
-    borderColor: BORDER_GREY,
+    textAlign: 'left', // Ensure left alignment
   },
   policyList: {
     marginTop: 10,
@@ -600,6 +774,7 @@ const styles = StyleSheet.create({
     color: TEXT_PRIMARY_DARK,
     marginBottom: 8,
     lineHeight: 20,
+    textAlign: 'left', // Ensure left alignment
   },
   bottomBar: {
     position: 'absolute',
@@ -612,8 +787,8 @@ const styles = StyleSheet.create({
     backgroundColor: MAIN_COLOR,
     paddingHorizontal: 20,
     paddingVertical: 15,
-    borderTopLeftRadius: BORDER_RADIUS * 2,
-    borderTopRightRadius: BORDER_RADIUS * 2,
+    borderTopLeftRadius: BORDER_RADIUS, // Consistent radius
+    borderTopRightRadius: BORDER_RADIUS, // Consistent radius
   },
   priceFooter: {
     flexDirection: 'row',
