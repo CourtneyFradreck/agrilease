@@ -13,7 +13,6 @@ import {
 
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '@/context/AuthContext';
-import { DataProvider } from '@/context/DataContext';
 import { Platform } from 'react-native';
 
 if (Platform.OS !== 'web') {
@@ -23,7 +22,6 @@ if (Platform.OS !== 'web') {
 export default function RootLayout() {
   useFrameworkReady();
 
-  const [splashComplete, setSplashComplete] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
     'Archivo-Regular': Archivo_400Regular,
     'Archivo-Medium': Archivo_500Medium,
@@ -51,52 +49,44 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <DataProvider>
-        <Stack>
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="equipment/[id]"
-            options={{
-              headerShown: false,
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen
-            name="booking/[id]"
-            options={{
-              headerShown: false,
-              headerTitle: 'Request Booking',
-              headerTintColor: '#1F2937',
-              headerStyle: {
-                backgroundColor: '#FFFFFF',
-              },
-              headerTitleStyle: {
-                fontFamily: 'Archivo-SemiBold',
-                fontSize: 18,
-              },
-            }}
-          />
-          <Stack.Screen
-            name="messages/[id]"
-            options={{
-              headerShown: false,
-              headerTitle: 'Messages',
-              headerTintColor: '#1F2937',
-              headerStyle: {
-                backgroundColor: '#FFFFFF',
-              },
-              headerTitleStyle: {
-                fontFamily: 'Archivo-SemiBold',
-                fontSize: 18,
-              },
-            }}
-          />
-          <Stack.Screen name="+not-found" options={{ headerShown: false }} />
-        </Stack>
-        <StatusBar style="dark" />
-      </DataProvider>
+      <Stack>
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="listings/[id]"
+          options={{
+            headerShown: false,
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="booking/[id]"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="messages/[id]"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="profile/settings"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="notifications"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen name="+not-found" options={{ headerShown: false }} />
+      </Stack>
+      <StatusBar style="dark" />
     </AuthProvider>
   );
 }

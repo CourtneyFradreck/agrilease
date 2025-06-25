@@ -13,6 +13,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useData } from '@/context/DataContext';
 import { Button } from '@/components/Button';
+import { db } from '@/FirebaseConfig';
+import { useEffect, useState } from 'react';
+import { collection, doc, getDoc } from 'firebase/firestore';
 
 const BORDER_RADIUS = 8;
 const MAIN_COLOR = '#4D7C0F';
@@ -27,9 +30,25 @@ const ERROR_RED = '#DC2626';
 export default function EquipmentDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getRentalEquipmentById } = useData();
+  const [equipment, setEquipment] = useState(null);
 
-  const equipment = getRentalEquipmentById(id);
+  useEffect(() => {
+    (async () => {
+      try {
+        console.log(id);
+        const docSnap = await getDoc(doc(db, 'listings', id));
+        if (!docSnap.exists) {
+          console.log('No such document!');
+        } else {
+          console.log('Document data:', docSnap.data());
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    })();
+
+    console.log('hello');
+  }, []);
 
   if (!equipment) {
     return (

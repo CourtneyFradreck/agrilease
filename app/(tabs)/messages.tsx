@@ -111,10 +111,15 @@ export default function MessagesInboxScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Messages</Text>
-      </View>
+    <View style={styles.container}>
+      <SafeAreaView style={styles.header}>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Messages</Text>
+          <Text style={styles.headerDescription}>
+            Your conversations and notifications
+          </Text>
+        </View>
+      </SafeAreaView>
 
       <FlatList
         data={mockConversations}
@@ -122,7 +127,7 @@ export default function MessagesInboxScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -133,19 +138,41 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: MAIN_COLOR,
-    paddingTop: Platform.OS === 'android' ? 35 : 0,
-    paddingBottom: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.2)',
+  },
+  headerContent: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    width: '100%',
+    paddingHorizontal: 18,
+    paddingTop: 30,
+    paddingBottom: 10,
   },
   headerTitle: {
     fontFamily: 'Archivo-Bold',
     fontSize: 18,
     color: HEADER_TEXT_COLOR,
+    textAlign: 'left',
+  },
+  headerDescription: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'left',
+    marginTop: 2,
   },
   listContent: {
+    paddingTop:
+      Platform.OS === 'android' ? 85 : 95 /* Adjusted for header height */,
     paddingVertical: 10,
-    paddingHorizontal: 15,
+    paddingHorizontal: 18 /* Consistent padding */,
+    marginTop: 10,
   },
   conversationItem: {
     flexDirection: 'row',
@@ -154,18 +181,18 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: BORDER_RADIUS,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: BORDER_GREY,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    borderWidth: 1, // Kept for definition
+    borderColor: BORDER_GREY, // Subtle border
+    shadowColor: 'transparent', // Removed shadow for flat design
+    shadowOffset: { width: 0, height: 0 }, // Removed shadow for flat design
+    shadowOpacity: 0, // Removed shadow for flat design
+    shadowRadius: 0, // Removed shadow for flat design
+    elevation: 0, // Removed elevation for flat design
   },
   avatarPlaceholder: {
     width: 48,
     height: 48,
-    borderRadius: 15,
+    borderRadius: BORDER_RADIUS, // Consistent border radius
     backgroundColor: MAIN_COLOR,
     justifyContent: 'center',
     alignItems: 'center',
