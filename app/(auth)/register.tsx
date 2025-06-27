@@ -10,23 +10,22 @@ import {
   ScrollView,
   SafeAreaView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/Button';
 import { z } from 'zod';
 import { UserSchema } from '@/utils/validators';
-import { Feather } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 
-const BORDER_RADIUS = 10;
+const BORDER_RADIUS = 8;
 const MAIN_COLOR = '#4D7C0F';
 const TEXT_PRIMARY_DARK = '#1F2937';
 const TEXT_SECONDARY_GREY = '#6B7280';
-const BACKGROUND_LIGHT_GREY = '#F9FAFB';
+const BACKGROUND_LIGHT_GREY = '#F0F2F5';
 const CARD_BACKGROUND = '#FFFFFF';
-const BORDER_GREY = '#E5E5E5';
+const BORDER_GREY = '#D1D5DB';
 const WARNING_COLOR = '#DC2626';
 const LIGHT_GREEN_BACKGROUND = '#F0FDF4';
 
@@ -121,7 +120,7 @@ export default function Register() {
         email: email,
         phoneNumber: phoneNumber,
         userType: userType,
-        profileImageUrl: undefined,
+        profileImageUrl: '',
         location: {
           latitude: parsedLatitude,
           longitude: parsedLongitude,
@@ -129,7 +128,7 @@ export default function Register() {
           region: region || undefined,
           country: country,
         },
-        bio: bio || undefined,
+        bio: bio || '',
       };
 
       UserSchema.omit({
@@ -139,7 +138,10 @@ export default function Register() {
         numberOfRatings: true,
       }).parse(userDataForSchema);
 
-      const success = await register(userDataForSchema, password);
+      const { success, error: registerError } = await register(
+        userDataForSchema,
+        password,
+      ); // Destructure the response
 
       if (success) {
         setTimeout(() => {
@@ -149,6 +151,7 @@ export default function Register() {
         setFieldErrors((prev) => ({
           ...prev,
           general:
+            registerError ||
             'Registration failed. Please check your details and try again.',
         }));
       }
@@ -302,13 +305,14 @@ export default function Register() {
       setLocationError(null);
     }
   };
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:
         return (
           <>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name *</Text>
+              <Text style={styles.label}>Full Name</Text>
               <TextInput
                 style={[styles.input, fieldErrors.name && styles.inputError]}
                 placeholder="e.g., John Doe"
@@ -323,7 +327,7 @@ export default function Register() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email *</Text>
+              <Text style={styles.label}>Email</Text>
               <TextInput
                 style={[styles.input, fieldErrors.email && styles.inputError]}
                 placeholder="e.g., john.doe@example.com"
@@ -340,7 +344,7 @@ export default function Register() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Phone Number *</Text>
+              <Text style={styles.label}>Phone Number</Text>
               <TextInput
                 style={[
                   styles.input,
@@ -376,7 +380,7 @@ export default function Register() {
                     onPress={fetchUserLocation}
                     style={styles.retryLocationButton}
                   >
-                    <Feather name="refresh-cw" size={16} color={MAIN_COLOR} />
+                    <FontAwesome name="refresh" size={16} color={MAIN_COLOR} />
                     <Text style={styles.retryLocationText}>Retry Location</Text>
                   </TouchableOpacity>
                 </View>
@@ -408,7 +412,7 @@ export default function Register() {
                   fieldErrors.country && styles.inputError,
                   { marginTop: 10 },
                 ]}
-                placeholder="Country *"
+                placeholder="Country"
                 placeholderTextColor={TEXT_SECONDARY_GREY}
                 value={country}
                 onChangeText={setCountry}
@@ -417,38 +421,6 @@ export default function Register() {
               {fieldErrors.country && (
                 <Text style={styles.inlineErrorText}>
                   {fieldErrors.country}
-                </Text>
-              )}
-
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.disabledInput,
-                  fieldErrors.latitude && styles.inputError,
-                  { marginTop: 10 },
-                ]}
-                value={latitude ? `Latitude: ${latitude}` : ''}
-                editable={false}
-              />
-              {fieldErrors.latitude && (
-                <Text style={styles.inlineErrorText}>
-                  {fieldErrors.latitude}
-                </Text>
-              )}
-
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.disabledInput,
-                  fieldErrors.longitude && styles.inputError,
-                  { marginTop: 10 },
-                ]}
-                value={longitude ? `Longitude: ${longitude}` : ''}
-                editable={false}
-              />
-              {fieldErrors.longitude && (
-                <Text style={styles.inlineErrorText}>
-                  {fieldErrors.longitude}
                 </Text>
               )}
             </View>
@@ -471,7 +443,7 @@ export default function Register() {
         return (
           <>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password *</Text>
+              <Text style={styles.label}>Password</Text>
               <TextInput
                 style={[
                   styles.input,
@@ -493,7 +465,7 @@ export default function Register() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Confirm Password *</Text>
+              <Text style={styles.label}>Confirm Password</Text>
               <TextInput
                 style={[
                   styles.input,
@@ -518,101 +490,118 @@ export default function Register() {
       case 2:
         return (
           <View style={styles.userTypeSelectionGroup}>
-            <Text style={styles.label}>I am a: *</Text>
-            <View style={styles.userTypeCardsContainer}>
+            <Text style={styles.label}>I am a:</Text>
+            <View style={styles.userTypeCardsList}>
+              {/* Renter Card */}
               <TouchableOpacity
                 style={[
                   styles.userTypeCard,
-                  userType === 'farmer' ? styles.userTypeCardActive : undefined,
+                  userType === 'farmer' ? styles.userTypeCardActive : null,
                 ]}
                 onPress={() => setUserType('farmer')}
                 activeOpacity={0.7}
                 disabled={isSubmitting}
               >
-                <Feather
-                  name="user"
-                  size={30}
-                  color={
-                    userType === 'farmer' ? MAIN_COLOR : TEXT_SECONDARY_GREY
-                  }
-                />
-                <Text
-                  style={[
-                    styles.userTypeCardTitle,
-                    userType === 'farmer'
-                      ? styles.userTypeCardTextActive
-                      : undefined,
-                  ]}
-                >
-                  Farmer (Renter)
-                </Text>
-                <Text style={styles.userTypeCardDescription}>
-                  Rent equipment for your farming operations.
-                </Text>
+                <View style={styles.cardIconContainer}>
+                  <FontAwesome
+                    name="user"
+                    size={24}
+                    color={
+                      userType === 'farmer' ? MAIN_COLOR : TEXT_SECONDARY_GREY
+                    }
+                  />
+                </View>
+                <View style={styles.cardTextContainer}>
+                  <Text
+                    style={[
+                      styles.userTypeCardTitle,
+                      userType === 'farmer'
+                        ? styles.userTypeCardTextActive
+                        : null,
+                    ]}
+                  >
+                    Renter
+                  </Text>
+                  <Text style={styles.userTypeCardDescription}>
+                    Rent equipment for your farming operations.
+                  </Text>
+                </View>
               </TouchableOpacity>
 
+              {/* Equipment Owner Card */}
               <TouchableOpacity
                 style={[
                   styles.userTypeCard,
                   userType === 'equipmentOwner'
                     ? styles.userTypeCardActive
-                    : undefined,
+                    : null,
                 ]}
                 onPress={() => setUserType('equipmentOwner')}
                 activeOpacity={0.7}
                 disabled={isSubmitting}
               >
-                <Feather
-                  name="tool"
-                  size={30}
-                  color={
-                    userType === 'equipmentOwner'
-                      ? MAIN_COLOR
-                      : TEXT_SECONDARY_GREY
-                  }
-                />
-                <Text
-                  style={[
-                    styles.userTypeCardTitle,
-                    userType === 'equipmentOwner'
-                      ? styles.userTypeCardTextActive
-                      : undefined,
-                  ]}
-                >
-                  Equipment Owner
-                </Text>
-                <Text style={styles.userTypeCardDescription}>
-                  List and rent out your own agricultural equipment.
-                </Text>
+                <View style={styles.cardIconContainer}>
+                  <FontAwesome
+                    name="wrench"
+                    size={24}
+                    color={
+                      userType === 'equipmentOwner'
+                        ? MAIN_COLOR
+                        : TEXT_SECONDARY_GREY
+                    }
+                  />
+                </View>
+                <View style={styles.cardTextContainer}>
+                  <Text
+                    style={[
+                      styles.userTypeCardTitle,
+                      userType === 'equipmentOwner'
+                        ? styles.userTypeCardTextActive
+                        : null,
+                    ]}
+                  >
+                    Equipment Owner
+                  </Text>
+                  <Text style={styles.userTypeCardDescription}>
+                    List and rent out your own agricultural equipment.
+                  </Text>
+                </View>
               </TouchableOpacity>
 
+              {/* Both Card */}
               <TouchableOpacity
                 style={[
                   styles.userTypeCard,
-                  userType === 'both' ? styles.userTypeCardActive : undefined,
+                  userType === 'both' ? styles.userTypeCardActive : null,
                 ]}
                 onPress={() => setUserType('both')}
                 activeOpacity={0.7}
                 disabled={isSubmitting}
               >
-                <Feather
-                  name="repeat"
-                  size={30}
-                  color={userType === 'both' ? MAIN_COLOR : TEXT_SECONDARY_GREY}
-                />
-                <Text
-                  style={[
-                    styles.userTypeCardTitle,
-                    userType === 'both'
-                      ? styles.userTypeCardTextActive
-                      : undefined,
-                  ]}
-                >
-                  Both
-                </Text>
-                <Text style={styles.userTypeCardDescription}>
-                  Access both roles: rent equipment and list yours.
-                </Text>
+                <View style={styles.cardIconContainer}>
+                  <FontAwesome
+                    name="exchange"
+                    size={24}
+                    color={
+                      userType === 'both' ? MAIN_COLOR : TEXT_SECONDARY_GREY
+                    }
+                  />
+                </View>
+                <View style={styles.cardTextContainer}>
+                  <Text
+                    style={[
+                      styles.userTypeCardTitle,
+                      userType === 'both'
+                        ? styles.userTypeCardTextActive
+                        : null,
+                    ]}
+                  >
+                    Both
+                  </Text>
+                  <Text style={styles.userTypeCardDescription}>
+                    Access both roles: rent equipment and list yours.
+                  </Text>
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -622,9 +611,22 @@ export default function Register() {
     }
   };
 
+  const getNextButtonStyles = () => {
+    let combinedStyle = { ...styles.nextButton };
+    if (currentStep === 0) {
+      combinedStyle = { ...combinedStyle, ...styles.nextButtonFullWidth };
+    } else {
+      combinedStyle = { ...combinedStyle, ...styles.nextButtonSharedWidth };
+    }
+    if (isSubmitting) {
+      combinedStyle = { ...combinedStyle };
+    }
+    return combinedStyle;
+  };
+
   if (loadingAuth && !isSubmitting) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.fullScreenLoadingContainer}>
         <ActivityIndicator size="large" color={MAIN_COLOR} />
         <Text style={styles.loadingText}>Setting up your account...</Text>
       </View>
@@ -642,10 +644,23 @@ export default function Register() {
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.contentWrapper}>
+            <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${((currentStep + 1) / totalSteps) * 100}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.stepIndicatorText}>
+              Step {currentStep + 1} of {totalSteps}
+            </Text>
+
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.description}>
               Join our community to easily rent or list agricultural equipment.
-              Fill in your details below to get started.
+              Fill in your details below to get started. All fields are required
+              unless marked optional.
             </Text>
 
             {fieldErrors.general && (
@@ -656,13 +671,13 @@ export default function Register() {
 
             <View style={styles.navigationButtons}>
               {currentStep > 0 && (
-                <Button
-                  text="Previous"
-                  onPress={handlePrevious}
+                <TouchableOpacity
                   style={styles.previousButton}
-                  textStyle={styles.previousButtonText}
+                  onPress={handlePrevious}
                   disabled={isSubmitting}
-                />
+                >
+                  <Text style={styles.previousButtonText}>Previous</Text>
+                </TouchableOpacity>
               )}
               <Button
                 text={
@@ -673,18 +688,12 @@ export default function Register() {
                     : 'Next'
                 }
                 onPress={validateAndProceed}
-                style={[
-                  styles.nextButton,
-                  currentStep === 0 ? styles.nextButtonFullWidth : undefined,
-                  currentStep === totalSteps - 1
-                    ? styles.finalButton
-                    : undefined,
-                  isSubmitting ? styles.disabledButton : undefined,
-                ]}
+                style={getNextButtonStyles()}
                 disabled={isSubmitting}
               />
             </View>
 
+            {/* Inline submitting indicator */}
             {isSubmitting && (
               <View style={styles.submittingContainer}>
                 <ActivityIndicator size="small" color={MAIN_COLOR} />
@@ -693,34 +702,22 @@ export default function Register() {
                 </Text>
               </View>
             )}
-
-            <View style={styles.progressIndicatorContainer}>
-              {[...Array(totalSteps)].map((_, index) => (
-                <View
-                  key={index}
+          </View>
+          {/* "Already have an account?" link moved to the bottom of ScrollView */}
+          <View style={styles.loginContainer}>
+            <Text style={styles.loginText}>Already have an account? </Text>
+            <Link href="/login" asChild>
+              <TouchableOpacity activeOpacity={0.7} disabled={isSubmitting}>
+                <Text
                   style={[
-                    styles.progressDot,
-                    index === currentStep && styles.activeProgressDot,
+                    styles.loginLink,
+                    isSubmitting && styles.disabledLink,
                   ]}
-                />
-              ))}
-            </View>
-
-            <View style={styles.loginContainer}>
-              <Text style={styles.loginText}>Already have an account? </Text>
-              <Link href="/login" asChild>
-                <TouchableOpacity activeOpacity={0.7} disabled={isSubmitting}>
-                  <Text
-                    style={[
-                      styles.loginLink,
-                      isSubmitting && styles.disabledLink,
-                    ]}
-                  >
-                    Sign In
-                  </Text>
-                </TouchableOpacity>
-              </Link>
-            </View>
+                >
+                  Sign In
+                </Text>
+              </TouchableOpacity>
+            </Link>
           </View>
         </SafeAreaView>
       </ScrollView>
@@ -749,9 +746,31 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 450,
     alignItems: 'flex-start',
+    flex: 1,
+  },
+  progressBarContainer: {
+    width: '100%',
+    height: 6,
+    backgroundColor: BORDER_GREY,
+    borderRadius: 3,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: MAIN_COLOR,
+    borderRadius: 3,
+  },
+  stepIndicatorText: {
+    fontFamily: 'Archivo-Medium',
+    fontSize: 14,
+    color: TEXT_SECONDARY_GREY,
+    marginBottom: 20,
+    textAlign: 'left',
+    width: '100%',
   },
   title: {
-    fontFamily: 'Archivo-Bold',
+    fontFamily: 'Archivo-SemiBold',
     fontSize: 28,
     color: TEXT_PRIMARY_DARK,
     textAlign: 'left',
@@ -794,7 +813,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   input: {
-    height: 55,
+    height: 48,
     borderWidth: 1,
     borderColor: BORDER_GREY,
     borderRadius: BORDER_RADIUS,
@@ -814,8 +833,8 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   textArea: {
-    height: 120,
-    paddingTop: 16,
+    height: 90,
+    paddingTop: 12,
   },
   locationLoading: {
     flexDirection: 'row',
@@ -865,107 +884,106 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     width: '100%',
   },
-  userTypeCardsContainer: {
+  userTypeCardsList: {
     flexDirection: 'column',
-    gap: 15,
+    gap: 10,
     width: '100%',
   },
   userTypeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: BORDER_GREY,
     borderRadius: BORDER_RADIUS,
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
     backgroundColor: CARD_BACKGROUND,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
     width: '100%',
   },
   userTypeCardActive: {
     borderColor: MAIN_COLOR,
     backgroundColor: LIGHT_GREEN_BACKGROUND,
   },
+  cardIconContainer: {
+    marginRight: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardTextContainer: {
+    flex: 1,
+  },
   userTypeCardTitle: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 16, // Smaller font size
+    fontFamily: 'Archivo-Medium',
+    fontSize: 15,
     color: TEXT_PRIMARY_DARK,
-    marginTop: 8, // Adjusted margin
-    marginBottom: 3, // Adjusted margin
-    textAlign: 'center',
+    marginBottom: 2,
+    textAlign: 'left',
   },
   userTypeCardTextActive: {
     color: MAIN_COLOR,
   },
   userTypeCardDescription: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 12, // Smaller font size
+    fontSize: 11,
     color: TEXT_SECONDARY_GREY,
-    textAlign: 'center',
-    lineHeight: 18, // Adjusted line height
-  },
-  userTypeButton: {
-    flex: 1,
-    height: 55,
-    borderWidth: 1,
-    borderColor: BORDER_GREY,
-    borderRadius: BORDER_RADIUS,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: CARD_BACKGROUND,
-  },
-  userTypeButtonActive: {
-    borderColor: MAIN_COLOR,
-    backgroundColor: LIGHT_GREEN_BACKGROUND,
-  },
-  userTypeButtonText: {
-    fontFamily: 'Archivo-Medium',
-    fontSize: 16,
-    color: TEXT_SECONDARY_GREY,
-    textAlign: 'center',
-  },
-  userTypeButtonTextActive: {
-    color: MAIN_COLOR,
+    textAlign: 'left',
+    lineHeight: 16,
   },
   navigationButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 25,
     width: '100%',
+    alignItems: 'center',
   },
   previousButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    height: 54,
+    paddingHorizontal: 20,
+    backgroundColor: 'transparent',
+    borderRadius: BORDER_RADIUS,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
     flex: 1,
     marginRight: 10,
-    backgroundColor: CARD_BACKGROUND,
-    borderColor: BORDER_GREY,
-    borderWidth: 1,
   },
   previousButtonText: {
+    fontFamily: 'Archivo-Medium',
+    fontSize: 16,
     color: TEXT_PRIMARY_DARK,
   },
   nextButton: {
     flex: 1,
     marginLeft: 10,
+    backgroundColor: MAIN_COLOR,
+    height: 54,
+    paddingVertical: 15,
   },
   nextButtonFullWidth: {
     flex: 1,
     marginLeft: 0,
     marginRight: 0,
   },
-  finalButton: {
-    backgroundColor: MAIN_COLOR,
+  nextButtonSharedWidth: {
+    flex: 1,
   },
   disabledButton: {
     opacity: 0.6,
   },
-  loadingContainer: {
+  fullScreenLoadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: BACKGROUND_LIGHT_GREY,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
   loadingText: {
     marginTop: 10,
@@ -986,27 +1004,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: TEXT_SECONDARY_GREY,
   },
-  progressIndicatorContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 30,
-    marginBottom: 20,
-    width: '100%',
-  },
-  progressDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: BORDER_GREY,
-    marginHorizontal: 5,
-  },
-  activeProgressDot: {
-    backgroundColor: MAIN_COLOR,
-  },
   loginContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 20,
+    marginBottom: 20,
     width: '100%',
   },
   loginText: {
@@ -1024,4 +1026,3 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
 });
-

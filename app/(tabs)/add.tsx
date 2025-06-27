@@ -13,9 +13,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/Button';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { db, firebaseConfig } from '@/FirebaseConfig';
+import { db } from '@/FirebaseConfig';
 import { EquipmentSchema, ListingSchema } from '@/utils/validators';
 import z from 'zod';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -28,8 +28,8 @@ const MAIN_COLOR = '#4D7C0F';
 const HEADER_TEXT_COLOR = '#FFFFFF';
 const TEXT_PRIMARY_DARK = '#1F2937';
 const TEXT_SECONDARY_GREY = '#6B7280';
-const BACKGROUND_LIGHT_GREY = '#F9FAFB'; // This is currently used for input backgrounds and some buttons
-const CARD_BACKGROUND = '#FFFFFF'; // This is the desired page background now
+const BACKGROUND_LIGHT_GREY = '#F9FAFB';
+const CARD_BACKGROUND = '#FFFFFF';
 const BORDER_GREY = '#E5E5E5';
 
 export default function AddListing() {
@@ -47,6 +47,9 @@ export default function AddListing() {
 
   const [condition, setCondition] = useState('');
   const [year, setYear] = useState('');
+  const [power, setPower] = useState('');
+  const [fuelType, setFuelType] = useState('');
+  const [transmissionType, setTransmissionType] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -117,7 +120,10 @@ export default function AddListing() {
         return;
       }
 
-      const newEquipmentData: Omit<z.infer<typeof EquipmentSchema>, 'id'> = {
+      const newEquipmentData: Omit<
+        z.infer<typeof EquipmentSchema>,
+        'id' | 'rating'
+      > = {
         name,
         type,
         make: make || '',
@@ -129,9 +135,17 @@ export default function AddListing() {
         condition: condition
           ? (condition as z.infer<typeof EquipmentSchema>['condition'])
           : 'Fair',
-        currentLocation: { latitude: 0, longitude: 0 },
-        lastUpdatedAt: Date.now(),
+        currentLocation: {
+          latitude: 0,
+          longitude: 0,
+        },
+        lastUpdatedAt: Timestamp.now(),
+        power: power || undefined,
+        fuelType: fuelType || undefined,
+        transmissionType: transmissionType || undefined,
       };
+
+      EquipmentSchema.parse(newEquipmentData);
 
       const equipmentCollectionRef = collection(db, `equipment`);
       const equipmentDocRef = await addDoc(
@@ -147,16 +161,21 @@ export default function AddListing() {
         status: 'active',
         price: priceValue,
         rentalUnit: listingType === 'rental' ? rentalUnit : undefined,
-        availabilityStartDate: Date.now(),
+        availabilityStartDate: Timestamp.now(),
         availabilityEndDate:
           listingType === 'rental'
-            ? Date.now() + 30 * 24 * 60 * 60 * 1000
+            ? Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000)
             : undefined,
-        createdAt: Date.now(),
-        listingLocation: { latitude: 0, longitude: 0 },
+        createdAt: Timestamp.now(),
+        listingLocation: {
+          latitude: 0,
+          longitude: 0,
+        },
         negotiable: false,
         views: 0,
       };
+
+      ListingSchema.parse(newListingData);
 
       const listingsCollectionRef = collection(db, `listings`);
       await addDoc(listingsCollectionRef, newListingData);
@@ -175,7 +194,14 @@ export default function AddListing() {
       );
     } catch (error) {
       console.error('Error adding listing: ', error);
-      Alert.alert('Error', 'Failed to add listing. Please try again.');
+      if (error instanceof z.ZodError) {
+        Alert.alert(
+          'Validation Error',
+          `Listing data invalid: ${error.errors.map((err) => err.message).join(', ')}`,
+        );
+      } else {
+        Alert.alert('Error', 'Failed to add listing. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -209,7 +235,6 @@ export default function AddListing() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Inputs rendered directly on the page, not inside a card */}
           <View style={styles.listingTypeContainer}>
             <Text style={styles.listingTypeLabel}>Listing Type:</Text>
             <View style={styles.listingTypeOptions}>
@@ -319,7 +344,7 @@ export default function AddListing() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Year</Text>
+            <Text style={styles.label}>Year of Manufacture</Text>
             <TextInput
               style={styles.input}
               placeholder="Enter manufacturing year"
@@ -327,6 +352,39 @@ export default function AddListing() {
               value={year}
               onChangeText={setYear}
               keyboardType="numeric"
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Power (e.g., hp, kW)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., 150 hp, 110 kW"
+              placeholderTextColor={TEXT_SECONDARY_GREY}
+              value={power}
+              onChangeText={setPower}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Fuel Type</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., Diesel, Petrol"
+              placeholderTextColor={TEXT_SECONDARY_GREY}
+              value={fuelType}
+              onChangeText={setFuelType}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Transmission Type</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., Automatic, Manual, CVT"
+              placeholderTextColor={TEXT_SECONDARY_GREY}
+              value={transmissionType}
+              onChangeText={setTransmissionType}
             />
           </View>
 
@@ -461,7 +519,7 @@ export default function AddListing() {
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: CARD_BACKGROUND, // Page background is now white
+    backgroundColor: CARD_BACKGROUND,
   },
   header: {
     flexDirection: 'row',
@@ -504,18 +562,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 18, // Consistent horizontal padding
-    paddingTop: Platform.OS === 'android' ? 85 : 95, // Adjusted to compensate for fixed header
-    paddingBottom: Platform.OS === 'ios' ? 70 + 24 : 65 + 24, // Adjusted for tab bar + button padding
+    paddingHorizontal: 18,
+    paddingTop: Platform.OS === 'android' ? 85 : 95,
+    paddingBottom: Platform.OS === 'ios' ? 70 + 24 : 65 + 24,
   },
-  // Removed formContainer style as inputs are now direct children
-  inputSection: {
-    // This style is now effectively gone, as the inputs are direct children of the ScrollView
-    // The individual inputContainer styles will handle spacing.
-  },
+  inputSection: {},
   listingTypeContainer: {
     marginBottom: 20,
-    marginTop: 10, // Add some top margin to the first element
+    marginTop: 10,
   },
   listingTypeLabel: {
     fontFamily: 'Archivo-Medium',
@@ -531,7 +585,7 @@ const styles = StyleSheet.create({
   listingTypeButton: {
     flex: 1,
     paddingVertical: 12,
-    backgroundColor: BACKGROUND_LIGHT_GREY, // Use light grey for these buttons
+    backgroundColor: BACKGROUND_LIGHT_GREY,
     borderRadius: BORDER_RADIUS,
     alignItems: 'center',
     marginHorizontal: 4,
@@ -574,7 +628,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Regular',
     fontSize: 16,
     color: TEXT_PRIMARY_DARK,
-    backgroundColor: BACKGROUND_LIGHT_GREY, // Use light grey for input background
+    backgroundColor: BACKGROUND_LIGHT_GREY,
     shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0,
@@ -592,7 +646,7 @@ const styles = StyleSheet.create({
   typeOption: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: BACKGROUND_LIGHT_GREY, // Use light grey for these options
+    backgroundColor: BACKGROUND_LIGHT_GREY,
     borderRadius: BORDER_RADIUS,
     marginRight: 8,
     borderWidth: 1,
@@ -622,7 +676,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER_GREY,
     borderRadius: BORDER_RADIUS,
-    backgroundColor: BACKGROUND_LIGHT_GREY, // Use light grey for price input background
+    backgroundColor: BACKGROUND_LIGHT_GREY,
     paddingHorizontal: 16,
     shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
@@ -651,7 +705,7 @@ const styles = StyleSheet.create({
   rentalUnitButton: {
     flex: 1,
     paddingVertical: 10,
-    backgroundColor: BACKGROUND_LIGHT_GREY, // Use light grey for these buttons
+    backgroundColor: BACKGROUND_LIGHT_GREY,
     borderRadius: BORDER_RADIUS,
     alignItems: 'center',
     marginHorizontal: 4,
