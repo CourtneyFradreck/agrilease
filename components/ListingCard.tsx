@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const BORDER_RADIUS = 8;
 const MAIN_COLOR = '#4D7C0F';
@@ -36,6 +37,8 @@ export const ListingCard: React.FC<ListingCardProps> = ({
   const { name, images, type, make, model, condition, yearOfManufacture } =
     equipment;
 
+  const [isBookmarked, setIsBookmarked] = useState(false);
+
   const imageUrl =
     images && images.length > 0 && images[0]
       ? images[0]
@@ -48,9 +51,30 @@ export const ListingCard: React.FC<ListingCardProps> = ({
   if (condition) detailsLineParts.push(condition);
   const detailsLine = detailsLineParts.join(' • ');
 
+  const handleBookmarkToggle = () => {
+    setIsBookmarked((prev) => !prev);
+    console.log(
+      `Bookmark toggled for listing ID: ${listing.id}. New status: ${!isBookmarked}`,
+    );
+  };
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
       <Image source={{ uri: imageUrl }} style={styles.image} />
+      <TouchableOpacity
+        style={[
+          styles.bookmarkIconContainer,
+          isBookmarked && styles.bookmarkIconContainerBookmarked,
+        ]}
+        onPress={handleBookmarkToggle}
+        activeOpacity={0.7}
+      >
+        <MaterialIcons
+          name={isBookmarked ? 'bookmark' : 'bookmark-border'}
+          size={24}
+          color={isBookmarked ? HEADER_TEXT_COLOR : HEADER_TEXT_COLOR}
+        />
+      </TouchableOpacity>
       <View style={styles.infoContainer}>
         <Text style={styles.equipmentName} numberOfLines={1}>
           {name}
@@ -93,8 +117,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER_GREY,
     overflow: 'hidden',
-    flex: 1, // Ensures it takes available space in a grid
-    minWidth: 150, // Minimum width for the card (to prevent extreme squishing)
+    flex: 1,
+    minWidth: 150,
     marginBottom: 10,
     shadowColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
@@ -104,35 +128,48 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    height: 100, // Slightly reduced image height for smaller cards
+    height: 100,
     resizeMode: 'cover',
   },
+  bookmarkIconContainer: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 4,
+    padding: 3,
+    zIndex: 1,
+  },
+  bookmarkIconContainerBookmarked: {
+    backgroundColor: MAIN_COLOR,
+    borderRadius: 4,
+  },
   infoContainer: {
-    paddingVertical: 8, // Reduced vertical padding
-    paddingHorizontal: 8, // Reduced horizontal padding
+    paddingVertical: 8,
+    paddingHorizontal: 8,
   },
   equipmentName: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 14, // Smaller font size
+    fontSize: 14,
     color: TEXT_PRIMARY_DARK,
-    marginBottom: 1, // Reduced margin
+    marginBottom: 1,
   },
   equipmentType: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 11, // Smaller font size
+    fontSize: 11,
     color: TEXT_SECONDARY_GREY,
-    marginBottom: 3, // Reduced margin
+    marginBottom: 3,
   },
   detailsLineText: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 10, // Even smaller for dense info
+    fontSize: 10,
     color: TEXT_SECONDARY_GREY,
-    marginBottom: 6, // Reduced margin
+    marginBottom: 6,
   },
   footerContainer: {
     backgroundColor: MAIN_COLOR,
-    paddingVertical: 8, // Reduced vertical padding
-    paddingHorizontal: 8, // Reduced horizontal padding
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -145,13 +182,13 @@ const styles = StyleSheet.create({
   },
   priceText: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 14, // Made price smaller
+    fontSize: 14,
     color: HEADER_TEXT_COLOR,
   },
   badge: {
     borderRadius: 4,
-    paddingHorizontal: 4, // Reduced padding
-    paddingVertical: 2, // Reduced padding
+    paddingHorizontal: 4,
+    paddingVertical: 2,
     alignSelf: 'flex-start',
     justifyContent: 'center',
     alignItems: 'center',
@@ -160,11 +197,10 @@ const styles = StyleSheet.create({
   negotiableBadge: {
     backgroundColor: CARD_BACKGROUND,
     borderColor: CARD_BACKGROUND,
-    // No top margin needed if price and badge are in a flex row
   },
   badgeText: {
     fontFamily: 'Archivo-Medium',
-    fontSize: 9, // Smallest font for badges
+    fontSize: 9,
     color: TEXT_PRIMARY_DARK,
   },
   negotiableBadgeText: {

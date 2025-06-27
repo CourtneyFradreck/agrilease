@@ -17,12 +17,10 @@ import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '@/FirebaseConfig';
 import { EquipmentSchema, ListingSchema } from '@/utils/validators';
-import z from 'zod';
 import { MaterialIcons } from '@expo/vector-icons';
+import { z } from 'zod';
 
-type ListingType = 'rental' | 'sale';
-type RentalUnit = 'day' | 'week' | 'month';
-
+// --- Constants ---
 const BORDER_RADIUS = 8;
 const MAIN_COLOR = '#4D7C0F';
 const HEADER_TEXT_COLOR = '#FFFFFF';
@@ -32,20 +30,26 @@ const BACKGROUND_LIGHT_GREY = '#F9FAFB';
 const CARD_BACKGROUND = '#FFFFFF';
 const BORDER_GREY = '#E5E5E5';
 
+// --- Type Definitions ---
+type ListingType = 'rental' | 'sale';
+type RentalUnit = 'hour' | 'day' | 'week' | 'month';
+type EquipmentCondition = z.infer<typeof EquipmentSchema>['condition'];
+
 export default function AddListing() {
   const router = useRouter();
 
+  // State variables for form inputs
   const [name, setName] = useState('');
   const [type, setType] = useState('');
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
+  const [locationAddress, setLocationAddress] = useState('');
   const [listingType, setListingType] = useState<ListingType>('rental');
   const [rentalUnit, setRentalUnit] = useState<RentalUnit>('day');
 
-  const [condition, setCondition] = useState('');
+  const [condition, setCondition] = useState<EquipmentCondition | ''>('');
   const [year, setYear] = useState('');
   const [power, setPower] = useState('');
   const [fuelType, setFuelType] = useState('');
@@ -53,6 +57,7 @@ export default function AddListing() {
 
   const [submitting, setSubmitting] = useState(false);
 
+  // Enum options for selectors
   const equipmentTypes = [
     'Tractor',
     'Harvester',
@@ -63,12 +68,36 @@ export default function AddListing() {
     'Other',
   ];
 
-  const handleTypeSelection = (selectedType: string) => {
-    setType(selectedType);
+  const equipmentConditions: EquipmentCondition[] = [
+    'Excellent',
+    'Good',
+    'Fair',
+    'Needs Repair',
+  ];
+
+  const rentalUnits: RentalUnit[] = ['hour', 'day', 'week', 'month'];
+
+  // Function to clear all form fields
+  const clearForm = () => {
+    setName('');
+    setType('');
+    setMake('');
+    setModel('');
+    setPrice('');
+    setDescription('');
+    setLocationAddress('');
+    setListingType('rental');
+    setRentalUnit('day');
+    setCondition('');
+    setYear('');
+    setPower('');
+    setFuelType('');
+    setTransmissionType('');
   };
 
   const handleAddListing = async () => {
-    if (!name || !type || !price || !description || !location) {
+    // Basic client-side validation
+    if (!name || !type || !price || !description || !locationAddress) {
       Alert.alert('Missing Information', 'Please fill in all required fields.');
       return;
     }
@@ -79,21 +108,24 @@ export default function AddListing() {
       return;
     }
 
-    const yearValue = year ? parseInt(year) : undefined;
+    const yearValue = year ? parseInt(year, 10) : undefined;
     if (
       year &&
       (isNaN(yearValue!) ||
         yearValue! < 1900 ||
         yearValue! > new Date().getFullYear() + 5)
     ) {
-      Alert.alert('Invalid Year', 'Please enter a valid manufacturing year.');
+      Alert.alert(
+        'Invalid Year',
+        'Please enter a valid manufacturing year (e.g., 2020).',
+      );
       return;
     }
 
     if (listingType === 'rental' && !rentalUnit) {
       Alert.alert(
         'Missing Information',
-        'Please select a rental unit (e.g., Day, Week).',
+        'Please select a rental unit (e.g., Day, Week, Hour, Month).',
       );
       return;
     }
@@ -116,10 +148,10 @@ export default function AddListing() {
           'Authentication Error',
           'You must be logged in to add a listing.',
         );
-        setSubmitting(false);
         return;
       }
 
+      // --- Prepare Equipment Data ---
       const newEquipmentData: Omit<
         z.infer<typeof EquipmentSchema>,
         'id' | 'rating'
@@ -132,12 +164,10 @@ export default function AddListing() {
         images: [],
         ownerId: currentUserId,
         description,
-        condition: condition
-          ? (condition as z.infer<typeof EquipmentSchema>['condition'])
-          : 'Fair',
+        condition: condition || 'Fair',
         currentLocation: {
-          latitude: 0,
-          longitude: 0,
+          latitude: -17.825166, // Example: Harare's latitude
+          longitude: 31.03351, // Example: Harare's longitude
         },
         lastUpdatedAt: Timestamp.now(),
         power: power || undefined,
@@ -145,15 +175,16 @@ export default function AddListing() {
         transmissionType: transmissionType || undefined,
       };
 
-      EquipmentSchema.parse(newEquipmentData);
+      const parsedEquipmentData = EquipmentSchema.parse(newEquipmentData);
 
       const equipmentCollectionRef = collection(db, `equipment`);
       const equipmentDocRef = await addDoc(
         equipmentCollectionRef,
-        newEquipmentData,
+        parsedEquipmentData,
       );
       const equipmentId = equipmentDocRef.id;
 
+      // --- Prepare Listing Data ---
       const newListingData: Omit<z.infer<typeof ListingSchema>, 'id'> = {
         equipmentId,
         ownerId: currentUserId,
@@ -168,8 +199,8 @@ export default function AddListing() {
             : undefined,
         createdAt: Timestamp.now(),
         listingLocation: {
-          latitude: 0,
-          longitude: 0,
+          latitude: -17.825166, // Example: Harare's latitude
+          longitude: 31.03351, // Example: Harare's longitude
         },
         negotiable: false,
         views: 0,
@@ -187,6 +218,7 @@ export default function AddListing() {
           {
             text: 'OK',
             onPress: () => {
+              clearForm(); // Clear the form on success
               router.push('/');
             },
           },
@@ -235,37 +267,39 @@ export default function AddListing() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.listingTypeContainer}>
-            <Text style={styles.listingTypeLabel}>Listing Type:</Text>
-            <View style={styles.listingTypeOptions}>
+          {/* Listing Type Selector */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Listing Purpose</Text>
+            <View style={styles.smallOptionContainer}>
+              {' '}
+              {/* Use new style for smaller buttons */}
               <TouchableOpacity
                 style={[
-                  styles.listingTypeButton,
-                  listingType === 'rental' && styles.listingTypeButtonActive,
+                  styles.smallOptionButton, // Use new style
+                  listingType === 'rental' && styles.smallOptionButtonActive,
                 ]}
                 onPress={() => setListingType('rental')}
               >
                 <Text
                   style={[
-                    styles.listingTypeText,
-                    listingType === 'rental' && styles.listingTypeTextActive,
+                    styles.smallOptionText, // Use new style
+                    listingType === 'rental' && styles.smallOptionTextActive,
                   ]}
                 >
                   For Rent
                 </Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[
-                  styles.listingTypeButton,
-                  listingType === 'sale' && styles.listingTypeButtonActive,
+                  styles.smallOptionButton, // Use new style
+                  listingType === 'sale' && styles.smallOptionButtonActive,
                 ]}
                 onPress={() => setListingType('sale')}
               >
                 <Text
                   style={[
-                    styles.listingTypeText,
-                    listingType === 'sale' && styles.listingTypeTextActive,
+                    styles.smallOptionText, // Use new style
+                    listingType === 'sale' && styles.smallOptionTextActive,
                   ]}
                 >
                   For Sale
@@ -274,44 +308,39 @@ export default function AddListing() {
             </View>
           </View>
 
+          {/* Equipment Name */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Equipment Name *</Text>
+            <Text style={styles.label}>Equipment Name</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter equipment name"
+              placeholder="e.g., John Deere 6155R"
               placeholderTextColor={TEXT_SECONDARY_GREY}
               value={name}
               onChangeText={setName}
             />
           </View>
 
+          {/* Equipment Type Selector */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Equipment Type *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Select or enter equipment type"
-              placeholderTextColor={TEXT_SECONDARY_GREY}
-              value={type}
-              onChangeText={setType}
-            />
+            <Text style={styles.label}>Equipment Type</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={styles.typeOptionsContainer}
+              contentContainerStyle={styles.smallOptionContainer}
             >
               {equipmentTypes.map((equipType) => (
                 <TouchableOpacity
                   key={equipType}
                   style={[
-                    styles.typeOption,
-                    type === equipType && styles.typeOptionActive,
+                    styles.smallOptionButton,
+                    type === equipType && styles.smallOptionButtonActive,
                   ]}
-                  onPress={() => handleTypeSelection(equipType)}
+                  onPress={() => setType(equipType)}
                 >
                   <Text
                     style={[
-                      styles.typeOptionText,
-                      type === equipType && styles.typeOptionTextActive,
+                      styles.smallOptionText,
+                      type === equipType && styles.smallOptionTextActive,
                     ]}
                   >
                     {equipType}
@@ -319,10 +348,21 @@ export default function AddListing() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            {/* Fallback for "Other" or custom input */}
+            {type === 'Other' && (
+              <TextInput
+                style={[styles.input, { marginTop: 10 }]}
+                placeholder="Specify other type"
+                placeholderTextColor={TEXT_SECONDARY_GREY}
+                value={type}
+                onChangeText={setType}
+              />
+            )}
           </View>
 
+          {/* Make (Optional) */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Make</Text>
+            <Text style={styles.label}>Make (optional)</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g., John Deere, Massey Ferguson"
@@ -332,8 +372,9 @@ export default function AddListing() {
             />
           </View>
 
+          {/* Model (Optional) */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Model</Text>
+            <Text style={styles.label}>Model (optional)</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g., 6155R, 2600"
@@ -343,20 +384,23 @@ export default function AddListing() {
             />
           </View>
 
+          {/* Year of Manufacture (Optional) */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Year of Manufacture</Text>
+            <Text style={styles.label}>Year of Manufacture (optional)</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter manufacturing year"
+              placeholder="e.g., 2020"
               placeholderTextColor={TEXT_SECONDARY_GREY}
               value={year}
               onChangeText={setYear}
               keyboardType="numeric"
+              maxLength={4}
             />
           </View>
 
+          {/* Power (Optional) */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Power (e.g., hp, kW)</Text>
+            <Text style={styles.label}>Power (e.g., hp, kW) (optional)</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g., 150 hp, 110 kW"
@@ -366,8 +410,9 @@ export default function AddListing() {
             />
           </View>
 
+          {/* Fuel Type (Optional) */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Fuel Type</Text>
+            <Text style={styles.label}>Fuel Type (optional)</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g., Diesel, Petrol"
@@ -377,8 +422,9 @@ export default function AddListing() {
             />
           </View>
 
+          {/* Transmission Type (Optional) */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Transmission Type</Text>
+            <Text style={styles.label}>Transmission Type (optional)</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g., Automatic, Manual, CVT"
@@ -388,9 +434,10 @@ export default function AddListing() {
             />
           </View>
 
+          {/* Price */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>
-              {listingType === 'rental' ? 'Rental Price *' : 'Selling Price *'}
+              {listingType === 'rental' ? 'Rental Price' : 'Selling Price'}
             </Text>
             <View style={styles.priceInputContainer}>
               <Text style={styles.currencySymbol}>$</Text>
@@ -399,86 +446,80 @@ export default function AddListing() {
                 placeholder="0.00"
                 placeholderTextColor={TEXT_SECONDARY_GREY}
                 value={price}
-                onChangeText={setPrice}
+                onChangeText={(text) => setPrice(text.replace(/[^0-9.]/g, ''))}
                 keyboardType="numeric"
               />
             </View>
           </View>
 
+          {/* Rental Unit (Conditional) */}
           {listingType === 'rental' && (
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Rental Unit *</Text>
-              <View style={styles.rentalUnitOptions}>
-                <TouchableOpacity
-                  style={[
-                    styles.rentalUnitButton,
-                    rentalUnit === 'day' && styles.rentalUnitButtonActive,
-                  ]}
-                  onPress={() => setRentalUnit('day')}
-                >
-                  <Text
+              <Text style={styles.label}>Rental Unit</Text>
+              <View style={styles.smallOptionContainer}>
+                {rentalUnits.map((unit) => (
+                  <TouchableOpacity
+                    key={unit}
                     style={[
-                      styles.rentalUnitText,
-                      rentalUnit === 'day' && styles.rentalUnitTextActive,
+                      styles.smallOptionButton,
+                      rentalUnit === unit && styles.smallOptionButtonActive,
                     ]}
+                    onPress={() => setRentalUnit(unit)}
                   >
-                    Per Day
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.rentalUnitButton,
-                    rentalUnit === 'week' && styles.rentalUnitButtonActive,
-                  ]}
-                  onPress={() => setRentalUnit('week')}
-                >
-                  <Text
-                    style={[
-                      styles.rentalUnitText,
-                      rentalUnit === 'week' && styles.rentalUnitTextActive,
-                    ]}
-                  >
-                    Per Week
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.rentalUnitButton,
-                    rentalUnit === 'month' && styles.rentalUnitButtonActive,
-                  ]}
-                  onPress={() => setRentalUnit('month')}
-                >
-                  <Text
-                    style={[
-                      styles.rentalUnitText,
-                      rentalUnit === 'month' && styles.rentalUnitTextActive,
-                    ]}
-                  >
-                    Per Month
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.smallOptionText,
+                        rentalUnit === unit && styles.smallOptionTextActive,
+                      ]}
+                    >
+                      Per {unit.charAt(0).toUpperCase() + unit.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           )}
 
+          {/* Condition (Conditional for sale listings) */}
           {listingType === 'sale' && (
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Condition *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., Excellent, Good, Fair"
-                placeholderTextColor={TEXT_SECONDARY_GREY}
-                value={condition}
-                onChangeText={setCondition}
-              />
+              <Text style={styles.label}>Condition</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.smallOptionContainer}
+              >
+                {equipmentConditions.map((eqCondition) => (
+                  <TouchableOpacity
+                    key={eqCondition}
+                    style={[
+                      styles.smallOptionButton,
+                      condition === eqCondition &&
+                        styles.smallOptionButtonActive,
+                    ]}
+                    onPress={() => setCondition(eqCondition)}
+                  >
+                    <Text
+                      style={[
+                        styles.smallOptionText,
+                        condition === eqCondition &&
+                          styles.smallOptionTextActive,
+                      ]}
+                    >
+                      {eqCondition}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           )}
 
+          {/* Description */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Description *</Text>
+            <Text style={styles.label}>Description</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Provide details about the equipment"
+              placeholder="Provide details about the equipment, its features, and any unique aspects."
               placeholderTextColor={TEXT_SECONDARY_GREY}
               value={description}
               onChangeText={setDescription}
@@ -488,17 +529,19 @@ export default function AddListing() {
             />
           </View>
 
+          {/* Location Address */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Location *</Text>
+            <Text style={styles.label}>Location Address</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter your location"
+              placeholder="e.g., 123 Farm Road, Harare"
               placeholderTextColor={TEXT_SECONDARY_GREY}
-              value={location}
-              onChangeText={setLocation}
+              value={locationAddress}
+              onChangeText={setLocationAddress}
             />
           </View>
 
+          {/* Submit Button */}
           <Button
             text={
               submitting
@@ -526,7 +569,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 18,
-    paddingTop: 30,
+    paddingTop: 30, // Adjust for SafeAreaView
     paddingBottom: 10,
     backgroundColor: MAIN_COLOR,
     position: 'absolute',
@@ -563,51 +606,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 18,
-    paddingTop: Platform.OS === 'android' ? 85 : 95,
-    paddingBottom: Platform.OS === 'ios' ? 70 + 24 : 65 + 24,
-  },
-  inputSection: {},
-  listingTypeContainer: {
-    marginBottom: 20,
-    marginTop: 10,
-  },
-  listingTypeLabel: {
-    fontFamily: 'Archivo-Medium',
-    fontSize: 16,
-    color: TEXT_PRIMARY_DARK,
-    marginBottom: 8,
-    textAlign: 'left',
-  },
-  listingTypeOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  listingTypeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    backgroundColor: BACKGROUND_LIGHT_GREY,
-    borderRadius: BORDER_RADIUS,
-    alignItems: 'center',
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: BORDER_GREY,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  listingTypeButtonActive: {
-    backgroundColor: MAIN_COLOR,
-    borderColor: MAIN_COLOR,
-  },
-  listingTypeText: {
-    fontFamily: 'Archivo-Medium',
-    fontSize: 16,
-    color: TEXT_SECONDARY_GREY,
-  },
-  listingTypeTextActive: {
-    color: HEADER_TEXT_COLOR,
+    paddingTop: 100, // Adjust for header height
+    paddingBottom: Platform.OS === 'ios' ? 70 + 24 : 65 + 24, // Adjust for button and spacing
   },
   inputContainer: {
     marginBottom: 20,
@@ -639,16 +639,19 @@ const styles = StyleSheet.create({
     height: 120,
     paddingTop: 16,
   },
-  typeOptionsContainer: {
+  // New styles for smaller option buttons (replaces listingType* and typeOption*)
+  smallOptionContainer: {
+    flexDirection: 'row',
+    // justifyContent: 'space-between', // Removed for flexibility in spacing
     marginTop: 8,
-    maxHeight: 44,
+    paddingRight: 8, // For horizontal scroll
   },
-  typeOption: {
+  smallOptionButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     backgroundColor: BACKGROUND_LIGHT_GREY,
     borderRadius: BORDER_RADIUS,
-    marginRight: 8,
+    marginRight: 8, // Space between buttons
     borderWidth: 1,
     borderColor: BORDER_GREY,
     shadowColor: 'transparent',
@@ -657,16 +660,16 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
     elevation: 0,
   },
-  typeOptionActive: {
+  smallOptionButtonActive: {
     backgroundColor: MAIN_COLOR,
     borderColor: MAIN_COLOR,
   },
-  typeOptionText: {
+  smallOptionText: {
     fontFamily: 'Archivo-Medium',
     fontSize: 14,
     color: TEXT_SECONDARY_GREY,
   },
-  typeOptionTextActive: {
+  smallOptionTextActive: {
     color: HEADER_TEXT_COLOR,
   },
   priceInputContainer: {
@@ -696,38 +699,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Regular',
     fontSize: 16,
     color: TEXT_PRIMARY_DARK,
-  },
-  rentalUnitOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  rentalUnitButton: {
-    flex: 1,
-    paddingVertical: 10,
-    backgroundColor: BACKGROUND_LIGHT_GREY,
-    borderRadius: BORDER_RADIUS,
-    alignItems: 'center',
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: BORDER_GREY,
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  rentalUnitButtonActive: {
-    backgroundColor: MAIN_COLOR,
-    borderColor: MAIN_COLOR,
-  },
-  rentalUnitText: {
-    fontFamily: 'Archivo-Medium',
-    fontSize: 14,
-    color: TEXT_SECONDARY_GREY,
-  },
-  rentalUnitTextActive: {
-    color: HEADER_TEXT_COLOR,
   },
   submitButton: {
     marginTop: 20,
