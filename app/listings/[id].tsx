@@ -13,11 +13,11 @@ import {
   ImageSourcePropType,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { MaterialIcons, Ionicons, Feather } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/Button';
 import { db } from '@/FirebaseConfig';
 import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 import { z } from 'zod';
@@ -27,7 +27,12 @@ type DetailedListing = z.infer<typeof ListingSchema> & {
   equipment: z.infer<typeof EquipmentSchema>;
   owner: Pick<
     z.infer<typeof UserSchema>,
-    'name' | 'email' | 'profileImageUrl' | 'id'
+    | 'name'
+    | 'email'
+    | 'profileImageUrl'
+    | 'id'
+    | 'averageRating'
+    | 'numberOfRatings'
   >;
 };
 
@@ -97,14 +102,13 @@ export default function EquipmentDetails() {
         const ownerDocRef = doc(db, `users`, listingData.ownerId);
         const ownerSnap = await getDoc(ownerDocRef);
 
-        let ownerData: Pick<
-          z.infer<typeof UserSchema>,
-          'name' | 'email' | 'profileImageUrl' | 'id'
-        > = {
+        let ownerData: DetailedListing['owner'] = {
           id: listingData.ownerId,
           name: 'Unknown User',
           email: '',
           profileImageUrl: defaultOwnerImage,
+          numberOfRatings: 0,
+          averageRating: 0,
         };
 
         if (ownerSnap.exists()) {
@@ -115,6 +119,8 @@ export default function EquipmentDetails() {
             email: parsedOwnerData.email,
             profileImageUrl:
               parsedOwnerData.profileImageUrl || defaultOwnerImage,
+            numberOfRatings: parsedOwnerData.numberOfRatings,
+            averageRating: parsedOwnerData.averageRating,
           };
         } else {
           console.warn(`Owner with ID ${listingData.ownerId} not found.`);
@@ -231,9 +237,10 @@ export default function EquipmentDetails() {
         : defaultEquipmentImage) || defaultEquipmentImage,
   };
 
-  const formatDate = (timestamp: number | undefined) => {
+  const formatDate = (timestamp: any) => {
     if (!timestamp) return 'N/A';
-    return new Date(timestamp).toLocaleDateString('en-US', {
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -306,8 +313,16 @@ export default function EquipmentDetails() {
               <View style={styles.ownerDetails}>
                 <Text style={styles.ownerName}>{owner.name}</Text>
                 <View style={styles.ownerRating}>
-                  <Text style={styles.ratingText}>Rating: 5.0 </Text>
-                  <Text style={styles.ratingText}>Reviews: 10 </Text>
+                  <Text style={styles.ratingText}>
+                    {owner.averageRating
+                      ? `Rating: ${owner.averageRating.toFixed(1)}`
+                      : 'No ratings yet'}
+                  </Text>
+                  <Text style={styles.ratingText}>
+                    {owner.numberOfRatings
+                      ? `Reviews: ${owner.numberOfRatings}`
+                      : ''}
+                  </Text>
                 </View>
               </View>
             </View>
