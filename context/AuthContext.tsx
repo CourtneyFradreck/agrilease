@@ -94,7 +94,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.log(
           'Auth State Changed: Registration is in progress, deferring full state update.',
         );
-        setLoadingAuth(false); // Can set loading to false here, or let the register finally block handle it
+        setLoadingAuth(false);
         return;
       }
 
@@ -102,8 +102,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           const userDocSnap = await getDoc(userDocRef);
-
-          console.log(userDocSnap);
 
           if (userDocSnap.exists()) {
             console.log('User document found.');
@@ -315,16 +313,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       for (const key in updates) {
         if (Object.prototype.hasOwnProperty.call(updates, key)) {
           const value = updates[key as keyof Partial<User>];
-          if (
-            (key === 'registrationDate' ||
-              key === 'lastUpdatedAt' ||
-              key === 'createdAt' ||
-              key === 'startDate' ||
-              key === 'endDate' ||
-              key === 'transactionDate' ||
-              key === 'bookingDate') &&
-            value instanceof Date
-          ) {
+          if (key === 'registrationDate' && value instanceof Date) {
             updatesForFirestore[key as keyof Partial<UserDataFromFirestore>] =
               Timestamp.fromDate(value) as any;
           } else {
