@@ -23,7 +23,15 @@ dayjs.extend(isSameOrBefore);
 
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { db } from '@/FirebaseConfig';
-import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  addDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+} from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { Timestamp } from 'firebase/firestore';
 
@@ -140,18 +148,9 @@ export default function BookingPage() {
         const parsedListing = ListingSchema.parse({
           ...listingData,
           id: listingSnap.id,
-          availabilityStartDate:
-            listingData.availabilityStartDate instanceof Date
-              ? Timestamp.fromDate(listingData.availabilityStartDate)
-              : listingData.availabilityStartDate,
-          availabilityEndDate:
-            listingData.availabilityEndDate instanceof Date
-              ? Timestamp.fromDate(listingData.availabilityEndDate)
-              : listingData.availabilityEndDate,
-          createdAt:
-            listingData.createdAt instanceof Date
-              ? Timestamp.fromDate(listingData.createdAt)
-              : listingData.createdAt,
+          availabilityStartDate: listingData.availabilityStartDate,
+          availabilityEndDate: listingData.availabilityEndDate,
+          createdAt: listingData.createdAt,
         });
         setListing(parsedListing);
 
@@ -167,10 +166,7 @@ export default function BookingPage() {
         const parsedEquipment = EquipmentSchema.parse({
           ...equipmentData,
           id: equipmentSnap.id,
-          lastUpdatedAt:
-            equipmentData.lastUpdatedAt instanceof Date
-              ? Timestamp.fromDate(equipmentData.lastUpdatedAt)
-              : equipmentData.lastUpdatedAt,
+          lastUpdatedAt: equipmentData.lastUpdatedAt,
         });
         setEquipment(parsedEquipment);
       } catch (e) {
@@ -272,6 +268,36 @@ export default function BookingPage() {
       };
 
       BookingSchema.parse(bookingData);
+
+      const bookingsRef = collection(db, 'bookings');
+      const q = query(
+        bookingsRef,
+        where('equipmentId', '==', equipment.id),
+        where('status', 'in', ['pending', 'confirmed']),
+      );
+
+      const existingBookings = await getDocs(q);
+      const hasConflict = existingBookings.docs.some((doc) => {
+        const booking = doc.data();
+        const bookingStart = booking.startDate.toDate();
+        const bookingEnd = booking.endDate.toDate();
+        const selectedStart = startDate.toDate();
+        const selectedEnd = endDate.toDate();
+
+        return (
+          (selectedStart >= bookingStart && selectedStart <= bookingEnd) ||
+          (selectedEnd >= bookingStart && selectedEnd <= bookingEnd) ||
+          (selectedStart <= bookingStart && selectedEnd >= bookingEnd)
+        );
+      });
+
+      if (hasConflict) {
+        Alert.alert(
+          'Booking Conflict',
+          'This equipment is already booked for some or all of the selected dates. Please choose different dates.',
+        );
+        return;
+      }
 
       await addDoc(collection(db, 'bookings'), bookingData);
 

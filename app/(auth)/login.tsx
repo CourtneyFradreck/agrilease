@@ -50,10 +50,6 @@ export default function Login() {
       }
     } catch (err: any) {
       console.error('Login component caught error:', err);
-      Alert.alert(
-        'Login Error',
-        'An unexpected error occurred during login. Please try again.',
-      );
       setError('An unexpected error occurred during login. Please try again.');
     } finally {
       setIsSubmitting(false);

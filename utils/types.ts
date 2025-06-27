@@ -1,4 +1,4 @@
-interface GeoPoint {
+export interface GeoPoint {
   latitude: number;
   longitude: number;
 }
