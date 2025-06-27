@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -62,6 +62,9 @@ const BORDER_GREY = '#E5E5E5';
 const TEXT_DARK_GREY = '#4B5563';
 const WARNING_COLOR = '#DC2626';
 const EMPTY_STATE_ICON_COLOR = '#9CA3AF';
+const DEFAULT_PROFILE_IMAGE = 'https://www.gravatar.com/avatar/?d=mp';
+const NO_IMAGE_PLACEHOLDER =
+  'https://placehold.co/100x70/E5E7EB/4B5563?text=No+Image';
 
 export default function Profile() {
   const { currentUser } = useAuth();
@@ -74,95 +77,34 @@ export default function Profile() {
   const [rentalsError, setRentalsError] = useState<string | null>(null);
   const [listingsError, setListingsError] = useState<string | null>(null);
 
-  const defaultProfileImage = 'https://www.gravatar.com/avatar/?d=mp';
+  const fetchMyRentals = useCallback(async () => {
+    if (!currentUser?.id) {
+      setLoadingRentals(false);
+      return;
+    }
+    setLoadingRentals(true);
+    setRentalsError(null);
+    try {
+      const q = query(
+        collection(db, 'bookings'),
+        where('renterId', '==', currentUser.id),
+      );
+      const querySnapshot = await getDocs(q);
+      const fetchedBookings: HydratedBooking[] = [];
 
-  useEffect(() => {
-    const fetchMyRentals = async () => {
-      if (!currentUser?.id) {
-        setLoadingRentals(false);
-        return;
-      }
-      setLoadingRentals(true);
-      setRentalsError(null);
-      try {
-        const q = query(
-          collection(db, 'bookings'),
-          where('renterId', '==', currentUser.id),
-        );
-        const querySnapshot = await getDocs(q);
-        const fetchedBookings: HydratedBooking[] = [];
+      for (const docSnapshot of querySnapshot.docs) {
+        const bookingData = BookingSchema.parse({
+          ...docSnapshot.data(),
+          id: docSnapshot.id,
+        });
 
-        for (const docSnapshot of querySnapshot.docs) {
-          const bookingData = BookingSchema.parse({
-            ...docSnapshot.data(),
-            id: docSnapshot.id,
-          });
+        const listingDocRef = doc(db, 'listings', bookingData.listingId);
+        const listingSnap = await getDoc(listingDocRef);
 
-          const listingDocRef = doc(db, 'listings', bookingData.listingId);
-          const listingSnap = await getDoc(listingDocRef);
-
-          if (listingSnap.exists()) {
-            const listingData = ListingSchema.parse({
-              ...listingSnap.data(),
-              id: listingSnap.id,
-            });
-
-            const equipmentDocRef = doc(
-              db,
-              'equipment',
-              listingData.equipmentId,
-            );
-            const equipmentSnap = await getDoc(equipmentDocRef);
-
-            if (equipmentSnap.exists()) {
-              const equipmentData = EquipmentSchema.parse({
-                ...equipmentSnap.data(),
-                id: equipmentSnap.id,
-              });
-              fetchedBookings.push({
-                ...bookingData,
-                listing: { ...listingData, equipment: equipmentData },
-              });
-            } else {
-              console.warn(
-                `Equipment not found for listing ${listingData.id} in booking ${bookingData.id}`,
-              );
-            }
-          } else {
-            console.warn(`Listing not found for booking ${bookingData.id}`);
-          }
-        }
-        setMyRentals(fetchedBookings);
-      } catch (e) {
-        console.error('Error fetching rentals: ', e);
-        setRentalsError('Failed to load rental history.');
-      } finally {
-        setLoadingRentals(false);
-      }
-    };
-    fetchMyRentals();
-  }, [currentUser?.id]);
-
-  useEffect(() => {
-    const fetchMyListings = async () => {
-      if (!currentUser?.id) {
-        setLoadingListings(false);
-        return;
-      }
-      setLoadingListings(true);
-      setListingsError(null);
-      try {
-        const q = query(
-          collection(db, 'listings'),
-          where('ownerId', '==', currentUser.id),
-        );
-        const querySnapshot = await getDocs(q);
-        const fetchedListings: HydratedListing[] = [];
-
-        for (const docSnapshot of querySnapshot.docs) {
+        if (listingSnap.exists()) {
           const listingData = ListingSchema.parse({
-            ...docSnapshot.data(),
-            id: docSnapshot.id,
+            ...listingSnap.data(),
+            id: listingSnap.id,
           });
 
           const equipmentDocRef = doc(db, 'equipment', listingData.equipmentId);
@@ -173,44 +115,103 @@ export default function Profile() {
               ...equipmentSnap.data(),
               id: equipmentSnap.id,
             });
-            fetchedListings.push({
-              ...listingData,
-              equipment: {
-                ...equipmentData,
-                rating: 4.8,
-                condition: equipmentData.condition || undefined,
-                yearOfManufacture: equipmentData.yearOfManufacture || undefined,
-              },
+            fetchedBookings.push({
+              ...bookingData,
+              listing: { ...listingData, equipment: equipmentData },
             });
           } else {
-            console.warn(`Equipment not found for listing ${listingData.id}`);
+            console.warn(
+              `Equipment not found for listing ${listingData.id} in booking ${bookingData.id}`,
+            );
           }
+        } else {
+          console.warn(`Listing not found for booking ${bookingData.id}`);
         }
-        setMyListings(fetchedListings);
-      } catch (e) {
-        console.error('Error fetching listings: ', e);
-        setListingsError('Failed to load your listings.');
-      } finally {
-        setLoadingListings(false);
       }
-    };
-    fetchMyListings();
+      setMyRentals(fetchedBookings);
+    } catch (e) {
+      console.error('Error fetching rentals: ', e);
+      setRentalsError('Failed to load rental history. Please try again.');
+    } finally {
+      setLoadingRentals(false);
+    }
   }, [currentUser?.id]);
+
+  const fetchMyListings = useCallback(async () => {
+    if (!currentUser?.id) {
+      setLoadingListings(false);
+      return;
+    }
+    setLoadingListings(true);
+    setListingsError(null);
+    try {
+      const q = query(
+        collection(db, 'listings'),
+        where('ownerId', '==', currentUser.id),
+      );
+      const querySnapshot = await getDocs(q);
+      const fetchedListings: HydratedListing[] = [];
+
+      for (const docSnapshot of querySnapshot.docs) {
+        const listingData = ListingSchema.parse({
+          ...docSnapshot.data(),
+          id: docSnapshot.id,
+        });
+
+        const equipmentDocRef = doc(db, 'equipment', listingData.equipmentId);
+        const equipmentSnap = await getDoc(equipmentDocRef);
+
+        if (equipmentSnap.exists()) {
+          const equipmentData = EquipmentSchema.parse({
+            ...equipmentSnap.data(),
+            id: equipmentSnap.id,
+          });
+          fetchedListings.push({
+            ...listingData,
+            equipment: {
+              ...equipmentData,
+              rating: 4.8,
+              condition: equipmentData.condition || undefined,
+              yearOfManufacture: equipmentData.yearOfManufacture || undefined,
+            },
+          });
+        } else {
+          console.warn(`Equipment not found for listing ${listingData.id}`);
+        }
+      }
+      setMyListings(fetchedListings);
+    } catch (e) {
+      console.error('Error fetching listings: ', e);
+      setListingsError('Failed to load your listings. Please try again.');
+    } finally {
+      setLoadingListings(false);
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    fetchMyRentals();
+  }, [fetchMyRentals]);
+
+  useEffect(() => {
+    fetchMyListings();
+  }, [fetchMyListings]);
 
   if (!currentUser) {
     return (
       <View style={styles.centeredContainer}>
+        <MaterialIcons name="lock" size={50} color={EMPTY_STATE_ICON_COLOR} />
         <Text style={styles.errorText}>You are not signed in.</Text>
         <Button
           text="Go to Login"
           onPress={() => router.replace('/login')}
           style={styles.loginButton}
+          textStyle={styles.actionButtonPrimaryText}
         />
       </View>
     );
   }
 
-  const formatLocation = () => {
+  const formatLocation = (): string => {
     const { location } = currentUser;
     if (!location) return 'Not set';
 
@@ -222,7 +223,9 @@ export default function Profile() {
     return parts.length > 0 ? parts.join(', ') : 'Not set';
   };
 
-  const getUserRoles = (userType: string) => {
+  const getUserRoles = (
+    userType: string,
+  ): Array<{ name: string; icon: string }> => {
     const roles = [];
     if (userType === 'farmer' || userType === 'both') {
       roles.push({ name: 'Farmer', icon: 'agriculture' });
@@ -240,22 +243,21 @@ export default function Profile() {
     <TouchableOpacity
       style={styles.rentalItemContainer}
       onPress={() => router.push(`/booking/${item.id}`)}
+      activeOpacity={0.7}
     >
       <Image
         source={{
-          uri:
-            item.listing.equipment.images?.[0] ||
-            'https://placehold.co/100x70/E5E7EB/4B5563?text=No+Image',
+          uri: item.listing.equipment.images?.[0] || NO_IMAGE_PLACEHOLDER,
         }}
         style={styles.rentalImage}
       />
       <View style={styles.rentalDetails}>
-        <Text style={styles.rentalEquipmentName}>
+        <Text style={styles.rentalEquipmentName} numberOfLines={1}>
           {item.listing.equipment.name}
         </Text>
         <Text style={styles.rentalDates}>
-          {new Date(item.startDate).toLocaleDateString()} -{' '}
-          {new Date(item.endDate).toLocaleDateString()}
+          {new Date(item.startDate.toDate()).toLocaleDateString()} -{' '}
+          {new Date(item.endDate.toDate()).toLocaleDateString()}
         </Text>
         <Text style={styles.rentalStatus}>
           Status: {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
@@ -267,6 +269,136 @@ export default function Profile() {
     </TouchableOpacity>
   );
 
+  const renderRentalsTabContent = () => {
+    if (loadingRentals) {
+      return (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={MAIN_COLOR} />
+          <Text style={styles.loadingMessage}>
+            Loading your rental history...
+          </Text>
+        </View>
+      );
+    }
+
+    if (rentalsError) {
+      return (
+        <View style={styles.errorState}>
+          <MaterialIcons name="error-outline" size={40} color={WARNING_COLOR} />
+          <Text style={styles.errorText}>{rentalsError}</Text>
+          <Button
+            text="Retry"
+            onPress={fetchMyRentals}
+            style={styles.actionButtonPrimary}
+            textStyle={styles.actionButtonPrimaryText}
+          />
+        </View>
+      );
+    }
+
+    if (myRentals.length === 0) {
+      return (
+        <View style={styles.emptyStateContainer}>
+          <MaterialIcons
+            name="access-time"
+            size={40}
+            color={EMPTY_STATE_ICON_COLOR}
+          />
+          <Text style={styles.emptyStateTitle}>No rental history</Text>
+          <Text style={styles.emptyStateText}>
+            You haven't rented any equipment yet. Start exploring!
+          </Text>
+          <Button
+            text="Browse Equipment"
+            onPress={() => router.push('/')}
+            style={styles.actionButtonPrimary}
+            textStyle={styles.actionButtonPrimaryText}
+          />
+        </View>
+      );
+    }
+
+    return (
+      <FlatList
+        data={myRentals}
+        renderItem={renderRentalItem}
+        keyExtractor={(item) => item.id!}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={false}
+      />
+    );
+  };
+
+  const renderListingsTabContent = () => {
+    if (loadingListings) {
+      return (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={MAIN_COLOR} />
+          <Text style={styles.loadingMessage}>Loading your listings...</Text>
+        </View>
+      );
+    }
+
+    if (listingsError) {
+      return (
+        <View style={styles.errorState}>
+          <MaterialIcons name="error-outline" size={40} color={WARNING_COLOR} />
+          <Text style={styles.errorText}>{listingsError}</Text>
+          <Button
+            text="Retry"
+            onPress={fetchMyListings}
+            style={styles.actionButtonPrimary}
+            textStyle={styles.actionButtonPrimaryText}
+          />
+        </View>
+      );
+    }
+
+    if (myListings.length === 0) {
+      return (
+        <View style={styles.emptyStateContainer}>
+          <MaterialIcons
+            name="description"
+            size={40}
+            color={EMPTY_STATE_ICON_COLOR}
+          />
+          <Text style={styles.emptyStateTitle}>No listings yet</Text>
+          <Text style={styles.emptyStateText}>
+            You haven't listed any equipment for rent or sale.
+          </Text>
+          {(currentUser.userType === 'equipmentOwner' ||
+            currentUser.userType === 'both') && (
+            <Button
+              text="Add New Listing"
+              onPress={() => router.push('/add')}
+              style={styles.actionButtonPrimary}
+              textStyle={styles.actionButtonPrimaryText}
+            />
+          )}
+        </View>
+      );
+    }
+
+    return (
+      <FlatList
+        data={myListings}
+        renderItem={({ item }) => (
+          <ListingCard
+            listing={item}
+            onPress={() => router.push(`/listings/${item.id}`)}
+          />
+        )}
+        keyExtractor={(item) => item.id!}
+        numColumns={2}
+        columnWrapperStyle={styles.listingRow}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={false}
+      />
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -274,12 +406,13 @@ export default function Profile() {
           <View style={styles.headerTextContent}>
             <Text style={styles.headerTitle}>My Profile</Text>
             <Text style={styles.headerDescription}>
-              Manage your account and listings
+              Manage your account and equipment
             </Text>
           </View>
           <TouchableOpacity
             style={styles.headerSettingsButton}
             onPress={() => router.push('/profile/settings')}
+            activeOpacity={0.7}
           >
             <Ionicons name="settings" size={24} color={HEADER_TEXT_COLOR} />
           </TouchableOpacity>
@@ -295,13 +428,13 @@ export default function Profile() {
           <View style={styles.profileInfoTopSection}>
             <Image
               source={{
-                uri: currentUser.profileImageUrl || defaultProfileImage,
+                uri: currentUser.profileImageUrl || DEFAULT_PROFILE_IMAGE,
               }}
               style={styles.profileImageLeft}
             />
             <View style={styles.userInfoRight}>
               <Text style={styles.name} numberOfLines={1}>
-                {currentUser.name}
+                {currentUser.name || 'User Name'}
               </Text>
 
               <View style={styles.infoLine}>
@@ -326,7 +459,10 @@ export default function Profile() {
 
               <View style={styles.userTypeBadgesContainer}>
                 {getUserRoles(currentUser.userType).map((role, index) => (
-                  <View key={index} style={styles.userTypeBadge}>
+                  <View
+                    key={`${role.name}-${index}`}
+                    style={styles.userTypeBadge}
+                  >
                     <MaterialIcons
                       name={role.icon as any}
                       size={14}
@@ -379,93 +515,9 @@ export default function Profile() {
         </View>
 
         <View style={styles.tabContent}>
-          {activeTab === 'rentals' ? (
-            loadingRentals ? (
-              <View style={styles.loadingState}>
-                <ActivityIndicator size="large" color={MAIN_COLOR} />
-                <Text style={styles.loadingMessage}>
-                  Loading your rentals...
-                </Text>
-              </View>
-            ) : rentalsError ? (
-              <View style={styles.errorState}>
-                <Text style={styles.errorText}>{rentalsError}</Text>
-              </View>
-            ) : myRentals.length > 0 ? (
-              <FlatList
-                data={myRentals}
-                renderItem={renderRentalItem}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                scrollEnabled={false}
-              />
-            ) : (
-              <View style={styles.emptyStateContainer}>
-                <MaterialIcons
-                  name="access-time"
-                  size={40}
-                  color={EMPTY_STATE_ICON_COLOR}
-                />
-                <Text style={styles.emptyStateTitle}>No rental history</Text>
-                <Text style={styles.emptyStateText}>
-                  You haven't rented any equipment yet.
-                </Text>
-                <Button
-                  text="Browse Equipment"
-                  onPress={() => router.push('/')}
-                  style={styles.actionButtonPrimary}
-                  textStyle={styles.actionButtonPrimaryText}
-                />
-              </View>
-            )
-          ) : loadingListings ? (
-            <View style={styles.loadingState}>
-              <ActivityIndicator size="large" color={MAIN_COLOR} />
-              <Text style={styles.loadingMessage}>
-                Loading your listings...
-              </Text>
-            </View>
-          ) : listingsError ? (
-            <View style={styles.errorState}>
-              <Text style={styles.errorText}>{listingsError}</Text>
-            </View>
-          ) : myListings.length > 0 ? (
-            <FlatList
-              data={myListings}
-              renderItem={({ item }) => (
-                <ListingCard
-                  listing={item}
-                  onPress={() => router.push(`/listings/${item.id}`)}
-                />
-              )}
-              numColumns={2}
-              columnWrapperStyle={styles.listingRow}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
-            />
-          ) : (
-            <View style={styles.emptyStateContainer}>
-              <MaterialIcons
-                name="description"
-                size={40}
-                color={EMPTY_STATE_ICON_COLOR}
-              />
-              <Text style={styles.emptyStateTitle}>No listings yet</Text>
-              <Text style={styles.emptyStateText}>
-                You haven't listed any equipment for rent or sale.
-              </Text>
-              {(currentUser.userType === 'equipmentOwner' ||
-                currentUser.userType === 'both') && (
-                <Button
-                  text="Add Listing"
-                  onPress={() => router.push('/add')}
-                  style={styles.actionButtonPrimary}
-                  textStyle={styles.actionButtonPrimaryText}
-                />
-              )}
-            </View>
-          )}
+          {activeTab === 'rentals'
+            ? renderRentalsTabContent()
+            : renderListingsTabContent()}
         </View>
       </ScrollView>
     </View>
@@ -482,6 +534,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: CARD_BACKGROUND,
+    padding: 20,
   },
   header: {
     backgroundColor: MAIN_COLOR,
@@ -492,12 +545,23 @@ const styles = StyleSheet.create({
     zIndex: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.2)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
   headerInner: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 18,
-    paddingTop: 30,
+    paddingTop: Platform.OS === 'android' ? 45 : 60,
     paddingBottom: 10,
     justifyContent: 'space-between',
   },
@@ -507,24 +571,23 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 18,
+    fontSize: 20,
     color: HEADER_TEXT_COLOR,
     textAlign: 'left',
   },
   headerDescription: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 11,
+    fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'left',
     marginTop: 2,
   },
   headerSettingsButton: {
-    padding: 6,
+    padding: 8,
   },
   scrollViewContent: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? 85 : 95,
-    marginTop: 20,
+    paddingTop: Platform.OS === 'android' ? 120 : 130,
     backgroundColor: CARD_BACKGROUND,
   },
   scrollViewContentContainer: {
@@ -535,25 +598,35 @@ const styles = StyleSheet.create({
     marginHorizontal: 18,
     marginTop: 10,
     marginBottom: 20,
-    padding: 0,
     backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
+    padding: 15,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 1,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   profileInfoTopSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 15,
     padding: 0,
     backgroundColor: CARD_BACKGROUND,
-    borderRadius: 0,
-    borderWidth: 0,
   },
   profileImageLeft: {
-    width: 70,
-    height: 70,
-    borderRadius: BORDER_RADIUS,
-    marginRight: 15,
-    borderWidth: 0,
-    borderColor: 'transparent',
+    width: 80,
+    height: 80,
+    borderRadius: BORDER_RADIUS + 4,
+    marginRight: 18,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+    resizeMode: 'cover',
   },
   userInfoRight: {
     flex: 1,
@@ -563,44 +636,44 @@ const styles = StyleSheet.create({
   },
   name: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 16,
+    fontSize: 18,
     color: TEXT_PRIMARY_DARK,
-    marginBottom: 4,
+    marginBottom: 6,
     textAlign: 'left',
     flexShrink: 1,
   },
   infoLine: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 2,
+    alignItems: 'center',
+    marginBottom: 4,
     flexWrap: 'wrap',
     flexShrink: 1,
     minWidth: 0,
   },
   infoLabel: {
     fontFamily: 'Archivo-Medium',
-    fontSize: 13,
+    fontSize: 14,
     color: TEXT_SECONDARY_GREY,
-    marginRight: 5,
+    marginRight: 6,
     flexShrink: 0,
   },
   infoValue: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 13,
+    fontSize: 14,
     color: TEXT_PRIMARY_DARK,
     flexShrink: 1,
   },
   userTypeBadgesContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 8,
+    marginTop: 10,
   },
   userTypeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: BACKGROUND_LIGHT_GREY,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: BORDER_RADIUS,
     marginRight: 8,
     marginBottom: 8,
@@ -609,62 +682,56 @@ const styles = StyleSheet.create({
   },
   userTypeBadgeText: {
     fontFamily: 'Archivo-Medium',
-    fontSize: 12,
-    color: TEXT_PRIMARY_DARK,
-    marginLeft: 4,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 15,
-    borderTopWidth: 0,
-    paddingTop: 0,
-    width: '100%',
-  },
-  actionButton: {
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    backgroundColor: 'transparent',
-    borderRadius: 0,
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  actionText: {
-    fontFamily: 'Archivo-Medium',
     fontSize: 13,
-    color: TEXT_DARK_GREY,
-    marginTop: 4,
-    textAlign: 'center',
+    color: TEXT_PRIMARY_DARK,
+    marginLeft: 6,
   },
   tabsSection: {
     flexDirection: 'row',
-    backgroundColor: 'transparent',
+    backgroundColor: CARD_BACKGROUND,
     marginHorizontal: 18,
+    marginTop: 10,
+    borderRadius: BORDER_RADIUS,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: 14,
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_GREY,
+    borderBottomWidth: 0,
+    backgroundColor: CARD_BACKGROUND,
   },
   activeTabButton: {
+    backgroundColor: BACKGROUND_LIGHT_GREY,
     borderBottomWidth: 3,
     borderBottomColor: MAIN_COLOR,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 1,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
   tabButtonText: {
     fontFamily: 'Archivo-Medium',
-    fontSize: 16,
+    fontSize: 15,
     color: TEXT_SECONDARY_GREY,
   },
   tabButtonTextActive: {
     color: MAIN_COLOR,
+    fontFamily: 'Archivo-Bold',
   },
   tabContent: {
     flex: 1,
     paddingHorizontal: 18,
-    paddingVertical: 0,
+    paddingTop: 15,
     minHeight: 300,
     backgroundColor: CARD_BACKGROUND,
   },
@@ -680,67 +747,74 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: 'transparent',
-    borderRadius: 0,
-    borderWidth: 0,
-    marginTop: 10,
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+    marginTop: 15,
+    minHeight: 250,
   },
   emptyStateTitle: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 18,
+    fontSize: 19,
     color: TEXT_DARK_GREY,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 18,
+    marginBottom: 10,
   },
   emptyStateText: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 16,
+    fontSize: 15,
     color: TEXT_SECONDARY_GREY,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 28,
+    lineHeight: 22,
   },
   actionButtonPrimary: {
     backgroundColor: MAIN_COLOR,
     borderRadius: BORDER_RADIUS,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    minWidth: 180,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    minWidth: 200,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 15,
   },
   actionButtonPrimaryText: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 16,
+    fontSize: 17,
     color: HEADER_TEXT_COLOR,
   },
   errorText: {
-    fontFamily: 'Archivo-Regular',
+    fontFamily: 'Archivo-Medium',
     fontSize: 16,
     color: WARNING_COLOR,
     textAlign: 'center',
     marginBottom: 16,
+    marginTop: 10,
   },
   loginButton: {
-    width: 200,
+    width: 220,
     backgroundColor: MAIN_COLOR,
+    borderRadius: BORDER_RADIUS,
+    paddingVertical: 14,
   },
   loadingState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: 200,
-    backgroundColor: 'transparent',
-    borderRadius: 0,
-    borderWidth: 0,
-    marginTop: 10,
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+    marginTop: 15,
   },
   loadingMessage: {
     fontFamily: 'Archivo-Regular',
     fontSize: 16,
     color: TEXT_SECONDARY_GREY,
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: 12,
   },
   errorState: {
     flex: 1,
@@ -748,10 +822,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     minHeight: 200,
-    backgroundColor: 'transparent',
-    borderRadius: 0,
-    borderWidth: 0,
-    marginTop: 10,
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+    marginTop: 15,
   },
   listContent: {
     paddingVertical: 5,
@@ -762,7 +837,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   rentalItemContainer: {
-    backgroundColor: BACKGROUND_LIGHT_GREY,
+    backgroundColor: CARD_BACKGROUND,
     borderRadius: BORDER_RADIUS,
     borderWidth: 1,
     borderColor: BORDER_GREY,
@@ -770,13 +845,26 @@ const styles = StyleSheet.create({
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 1,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
   rentalImage: {
     width: 90,
     height: 70,
-    borderRadius: BORDER_RADIUS,
+    borderRadius: BORDER_RADIUS - 2,
     marginRight: 12,
     resizeMode: 'cover',
+    borderWidth: 0.5,
+    borderColor: BORDER_GREY,
   },
   rentalDetails: {
     flex: 1,
@@ -786,21 +874,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Bold',
     fontSize: 17,
     color: TEXT_PRIMARY_DARK,
-    marginBottom: 2,
+    marginBottom: 4,
     textAlign: 'left',
   },
   rentalDates: {
     fontFamily: 'Archivo-Regular',
     fontSize: 14,
     color: TEXT_SECONDARY_GREY,
-    marginBottom: 2,
+    marginBottom: 4,
     textAlign: 'left',
   },
   rentalStatus: {
     fontFamily: 'Archivo-Medium',
     fontSize: 14,
     color: MAIN_COLOR,
-    marginBottom: 2,
+    marginBottom: 4,
     textAlign: 'left',
   },
   rentalPrice: {

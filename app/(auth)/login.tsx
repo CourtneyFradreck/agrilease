@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Regular',
     fontSize: 16,
     color: HEADER_TEXT_COLOR,
-    textAlign: 'left',
+    textAlign: 'center', // Changed to center for better visual balance
     paddingHorizontal: 20,
   },
   formContainer: {
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   title: {
-    fontFamily: 'Archivo-Bold',
+    fontFamily: 'Archivo-SemiBold', // Less bold as requested
     fontSize: 28,
     color: TEXT_PRIMARY_DARK,
     marginBottom: 8,
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    height: 52,
+    height: 52, // Retained original height
     borderWidth: 1,
     borderColor: BORDER_GREY,
     borderRadius: BORDER_RADIUS,
@@ -253,7 +253,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
     backgroundColor: MAIN_COLOR,
     borderRadius: BORDER_RADIUS,
-    paddingVertical: 14,
+    paddingVertical: 15, // Adjusted to match register form button padding
+    height: 54, // Ensured consistent height with register form buttons
   },
   submittingContainer: {
     flexDirection: 'row',
@@ -282,6 +283,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Medium',
     fontSize: 15,
     color: MAIN_COLOR,
+    textDecorationLine: 'underline',
   },
   disabledLink: {
     opacity: 0.5,

@@ -1,8 +1,13 @@
 import { z } from 'zod';
+import { Timestamp } from 'firebase/firestore';
 
 export const GeoPointSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
+});
+
+export const FirestoreTimestampSchema = z.instanceof(Timestamp, {
+  message: 'Value must be a Firebase Firestore Timestamp object.',
 });
 
 export const UserSchema = z.object({
@@ -22,10 +27,7 @@ export const UserSchema = z.object({
     region: z.string().optional(),
     country: z.string().min(1, 'Country cannot be empty.'),
   }),
-  registrationDate: z
-    .number()
-    .int()
-    .positive('Registration date must be a positive integer timestamp.'),
+  registrationDate: FirestoreTimestampSchema,
   bio: z.string().optional().default(''),
   averageRating: z
     .number()
@@ -59,10 +61,11 @@ export const EquipmentSchema = z.object({
     .array(z.string().url('Invalid image URL.'))
     .min(0, 'At least one image URL is recommended.'),
   currentLocation: GeoPointSchema,
-  lastUpdatedAt: z
-    .number()
-    .int()
-    .positive('Last updated timestamp must be a positive integer.'),
+  lastUpdatedAt: FirestoreTimestampSchema,
+  rating: z.number().min(0).max(5).optional(),
+  power: z.string().optional(),
+  fuelType: z.string().optional(),
+  transmissionType: z.string().optional(),
 });
 
 export const ListingSchema = z.object({
@@ -73,20 +76,9 @@ export const ListingSchema = z.object({
   status: z.enum(['active', 'pending_transaction', 'completed', 'cancelled']),
   price: z.number().positive('Price must be a positive number.').min(0),
   rentalUnit: z.enum(['hour', 'day', 'week', 'month']).optional(),
-  availabilityStartDate: z
-    .number()
-    .int()
-    .positive('Start date must be a positive integer timestamp.')
-    .optional(),
-  availabilityEndDate: z
-    .number()
-    .int()
-    .positive('End date must be a positive integer timestamp.')
-    .optional(),
-  createdAt: z
-    .number()
-    .int()
-    .positive('Creation timestamp must be a positive integer.'),
+  availabilityStartDate: FirestoreTimestampSchema.optional(),
+  availabilityEndDate: FirestoreTimestampSchema.optional(),
+  createdAt: FirestoreTimestampSchema,
   listingLocation: GeoPointSchema,
   negotiable: z.boolean(),
   views: z.number().int().min(0, 'Views cannot be negative.').default(0),
@@ -108,20 +100,9 @@ export const TransactionSchema = z.object({
     'disputed',
   ]),
   agreedPrice: z.number().positive('Agreed price must be a positive number.'),
-  startDate: z
-    .number()
-    .int()
-    .positive('Start date must be a positive integer timestamp.')
-    .optional(),
-  endDate: z
-    .number()
-    .int()
-    .positive('End date must be a positive integer timestamp.')
-    .optional(),
-  transactionDate: z
-    .number()
-    .int()
-    .positive('Transaction date must be a positive integer timestamp.'),
+  startDate: FirestoreTimestampSchema.optional(),
+  endDate: FirestoreTimestampSchema.optional(),
+  transactionDate: FirestoreTimestampSchema,
   paymentStatus: z.enum(['pending', 'paid', 'refunded', 'partially_paid']),
   ownerReviewId: z.string().optional(),
   customerReviewId: z.string().optional(),
@@ -138,10 +119,7 @@ export const ReviewSchema = z.object({
     .min(1, 'Rating must be an integer between 1 and 5.')
     .max(5),
   comment: z.string().optional(),
-  createdAt: z
-    .number()
-    .int()
-    .positive('Creation timestamp must be a positive integer.'),
+  createdAt: FirestoreTimestampSchema,
 });
 
 export const BookingSchema = z
@@ -151,23 +129,16 @@ export const BookingSchema = z
     listingId: z.string().min(1, 'Listing ID is required.'),
     renterId: z.string().min(1, 'Renter ID is required.'),
     ownerId: z.string().min(1, 'Owner ID is required.'),
-    startDate: z
-      .number()
-      .int()
-      .positive('Start date must be a valid timestamp.'), // Timestamp in milliseconds
-    endDate: z.number().int().positive('End date must be a valid timestamp.'), // Timestamp in milliseconds
+    startDate: FirestoreTimestampSchema,
+    endDate: FirestoreTimestampSchema,
     totalPrice: z.number().positive('Total price must be a positive number.'),
-    bookingDate: z
-      .number()
-      .int()
-      .positive('Booking date must be a valid timestamp.')
-      .default(() => Date.now()), // Timestamp
+    bookingDate: FirestoreTimestampSchema.default(() => Timestamp.now()),
     status: z
       .enum(['pending', 'accepted', 'rejected', 'completed', 'cancelled'])
       .default('pending'),
   })
   .superRefine((data, ctx) => {
-    if (data.startDate >= data.endDate) {
+    if (data.startDate.toMillis() >= data.endDate.toMillis()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'End date must be after start date.',
