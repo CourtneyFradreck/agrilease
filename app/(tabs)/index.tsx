@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,14 +10,16 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/FirebaseConfig';
 import { ListingCard } from '@/components/ListingCard';
 import { EquipmentSchema, ListingSchema } from '@/utils/validators';
 import { z } from 'zod';
+import { useFocusEffect } from '@react-navigation/native';
 
 type EquipmentFromDB = z.infer<typeof EquipmentSchema>;
 type ListingFromDB = z.infer<typeof ListingSchema>;
@@ -49,17 +51,18 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const categories = [
-    'Tractors',
-    'Harvesters',
-    'Seeders',
-    'Sprayers',
+    'Tractor',
+    'Harvester',
+    'Seeder',
+    'Sprayer',
     'Tillage',
-    'Loaders',
-    'Plows',
-    'Cultivators',
+    'Loader',
+    'Plow',
+    'Cultivator',
   ];
 
   const getGreeting = () => {
@@ -69,68 +72,82 @@ export default function Dashboard() {
     return 'Good evening';
   };
 
-  useEffect(() => {
-    const fetchListingsData = async () => {
-      try {
-        setLoading(true);
+  const fetchListingsData = useCallback(async () => {
+    if (!refreshing) {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const equipmentCollectionRef = collection(db, `equipment`);
+      const equipmentSnapshot = await getDocs(equipmentCollectionRef);
+      const equipments: { [key: string]: EquipmentFromDB } = {};
 
-        const equipmentCollectionRef = collection(db, `equipment`);
-        const equipmentSnapshot = await getDocs(equipmentCollectionRef);
-        const equipments: { [key: string]: EquipmentFromDB } = {};
-
-        equipmentSnapshot.docs.forEach((doc) => {
-          try {
-            const parsedEquipment = EquipmentSchema.parse({
-              id: doc.id,
-              ...doc.data(),
-            });
-            equipments[doc.id] = parsedEquipment;
-          } catch (e) {
-            console.error(`Error parsing equipment ${doc.id}:`, e);
-          }
-        });
-
-        const listingsCollectionRef = collection(db, `listings`);
-        const listingsSnapshot = await getDocs(listingsCollectionRef);
-        const hydratedListings: HydratedListing[] = [];
-
-        for (const doc of listingsSnapshot.docs) {
-          try {
-            const parsedListing = ListingSchema.parse({
-              id: doc.id,
-              ...doc.data(),
-            });
-            const associatedEquipment = equipments[parsedListing.equipmentId];
-
-            if (associatedEquipment) {
-              hydratedListings.push({
-                ...parsedListing,
-                equipment: {
-                  ...associatedEquipment,
-                },
-              });
-            } else {
-              console.warn(
-                `Equipment with ID ${parsedListing.equipmentId} not found for listing ${doc.id}`,
-              );
-            }
-          } catch (e) {
-            console.error(`Error parsing listing ${doc.id}:`, e);
-          }
+      equipmentSnapshot.docs.forEach((doc) => {
+        try {
+          const parsedEquipment = EquipmentSchema.parse({
+            id: doc.id,
+            ...doc.data(),
+          });
+          equipments[doc.id] = parsedEquipment;
+        } catch (e) {
+          console.error(`Error parsing equipment ${doc.id}:`, e);
         }
+      });
 
-        setAllListings(hydratedListings);
-        setFilteredListings(hydratedListings);
-      } catch (e) {
-        setError('Failed to fetch data: ' + (e as Error).message);
-        console.error('Firebase fetch error:', e);
-      } finally {
-        setLoading(false);
+      const listingsQuery = query(
+        collection(db, `listings`),
+        orderBy('createdAt', 'desc'),
+        limit(50),
+      );
+      const listingsSnapshot = await getDocs(listingsQuery);
+      const hydratedListings: HydratedListing[] = [];
+
+      for (const doc of listingsSnapshot.docs) {
+        try {
+          const parsedListing = ListingSchema.parse({
+            id: doc.id,
+            ...doc.data(),
+          });
+          const associatedEquipment = equipments[parsedListing.equipmentId];
+
+          if (associatedEquipment) {
+            hydratedListings.push({
+              ...parsedListing,
+              equipment: {
+                ...associatedEquipment,
+              },
+            });
+          } else {
+            console.warn(
+              `Equipment with ID ${parsedListing.equipmentId} not found for listing ${doc.id}`,
+            );
+          }
+        } catch (e) {
+          console.error(`Error parsing listing ${doc.id}:`, e);
+        }
       }
-    };
 
-    fetchListingsData();
-  }, []);
+      setAllListings(hydratedListings);
+      setFilteredListings(hydratedListings);
+    } catch (e) {
+      setError('Failed to fetch data: ' + (e as Error).message);
+      console.error('Firebase fetch error:', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [refreshing]);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Dashboard screen focused, fetching listings...');
+      fetchListingsData();
+
+      return () => {
+        console.log('Dashboard screen unfocused');
+      };
+    }, [fetchListingsData]),
+  );
 
   useEffect(() => {
     let currentFiltered = allListings;
@@ -174,7 +191,7 @@ export default function Dashboard() {
         <Text
           style={[styles.categoryText, isActive && styles.categoryTextActive]}
         >
-          {category}
+          {category}s
         </Text>
       </TouchableOpacity>
     );
@@ -185,7 +202,12 @@ export default function Dashboard() {
     router.push('/notifications');
   };
 
-  if (loading) {
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchListingsData();
+  }, [fetchListingsData]);
+
+  if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={MAIN_COLOR} />
@@ -198,6 +220,20 @@ export default function Dashboard() {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Error: {error}</Text>
+        <TouchableOpacity
+          onPress={onRefresh}
+          style={{
+            marginTop: 20,
+            padding: 10,
+            borderWidth: 1,
+            borderColor: MAIN_COLOR,
+            borderRadius: BORDER_RADIUS,
+          }}
+        >
+          <Text style={{ color: MAIN_COLOR, fontFamily: 'Archivo-Medium' }}>
+            Tap to Retry
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -207,7 +243,6 @@ export default function Dashboard() {
 
   return (
     <View style={styles.container}>
-      {/* Fixed Header Section */}
       <View style={styles.fixedHeader}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.headerContent}>
@@ -254,13 +289,19 @@ export default function Dashboard() {
         </SafeAreaView>
       </View>
 
-      {/* Scrollable Content */}
       <ScrollView
         style={styles.scrollViewContent}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollViewContentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[MAIN_COLOR]}
+            tintColor={MAIN_COLOR}
+          />
+        }
       >
-        {/* Categories Section */}
         <View style={styles.categoriesSection}>
           <Text style={styles.categoriesTitle}>Categories</Text>
           <Text style={styles.categoriesSubtitle}>
@@ -275,7 +316,6 @@ export default function Dashboard() {
           </ScrollView>
         </View>
 
-        {/* Display all listings or filtered listings directly */}
         {listingsToDisplay.length > 0 ? (
           <FlatList
             data={listingsToDisplay}
@@ -285,6 +325,7 @@ export default function Dashboard() {
                 onPress={() => router.push(`/listings/${item.id}`)}
               />
             )}
+            keyExtractor={(item) => item.id!}
             numColumns={2}
             columnWrapperStyle={styles.gridRow}
             contentContainerStyle={styles.gridContainer}

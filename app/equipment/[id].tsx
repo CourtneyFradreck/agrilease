@@ -10,6 +10,7 @@ import {
   Platform,
   SafeAreaView,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -45,6 +46,10 @@ const ERROR_RED = '#DC2626';
 const DEFAULT_OWNER_IMAGE = 'https://www.gravatar.com/avatar/?d=mp';
 const NO_IMAGE_PLACEHOLDER =
   'https://placehold.co/100x70/E5E7EB/4B5563?text=No+Image';
+
+const { width } = Dimensions.get('window');
+const SPEC_ITEM_MARGIN = 8; // Margin between grid items
+const NUM_COLUMNS = 2; // Number of columns in the specifications grid
 
 export default function EquipmentDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -92,16 +97,18 @@ export default function EquipmentDetails() {
           id: equipmentSnap.id,
         });
 
+        const ownerDetails = {
+          name: 'John Doe',
+          profileImageUrl:
+            'https://www.courtney.codes/assets/images/courtney.jpg',
+          averageRating: 4.8,
+          numberOfRatings: 14,
+        };
+
         const hydratedListing: HydratedListing = {
           ...listingData,
           equipment: equipmentData,
-          owner: {
-            name: 'John Doe',
-            profileImageUrl:
-              'https://www.courtney.codes/assets/images/courtney.jpg',
-            averageRating: 4.8,
-            numberOfRatings: 14,
-          },
+          owner: ownerDetails,
         };
 
         setListing(hydratedListing);
@@ -160,6 +167,25 @@ export default function EquipmentDetails() {
 
   const { equipment, owner } = listing;
 
+  // Prepare specifications for grid display
+  const specifications = [
+    { label: 'Power', value: equipment.power },
+    { label: 'Fuel Type', value: equipment.fuelType },
+    { label: 'Year', value: equipment.yearOfManufacture },
+    { label: 'Transmission', value: equipment.transmissionType },
+    { label: 'Condition', value: equipment.condition },
+    { label: 'Make', value: equipment.make },
+    { label: 'Model', value: equipment.model },
+    { label: 'Type', value: equipment.type },
+  ].filter((spec) => spec.value); // Filter out specs without a value
+
+  // Calculate item width for grid
+  const itemWidth =
+    (width -
+      styles.contentCard.paddingHorizontal * 2 -
+      SPEC_ITEM_MARGIN * (NUM_COLUMNS - 1)) /
+    NUM_COLUMNS;
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.header}>
@@ -189,11 +215,14 @@ export default function EquipmentDetails() {
 
         <View style={styles.contentCard}>
           <Text style={styles.name}>{equipment.name}</Text>
-          <Text style={styles.carRating}>
-            Equipment Rating: {equipment.rating?.toFixed(1) || 'N/A'}/5.0
-          </Text>
+          {equipment.rating !== undefined && (
+            <Text style={styles.equipmentRating}>
+              Equipment Rating: {equipment.rating?.toFixed(1) || 'N/A'}/5.0
+            </Text>
+          )}
 
-          <View style={styles.section}>
+          <View style={[styles.section, styles.ownerInfoCard]}>
+            <Text style={styles.sectionTitle}>Listed by</Text>
             <View style={styles.ownerInfoContent}>
               <Image
                 source={{
@@ -213,53 +242,29 @@ export default function EquipmentDetails() {
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={handleContactOwner}>
-                <Text style={styles.contactOwnerText}>Contact Owner</Text>
-              </TouchableOpacity>
+              <Button
+                onPress={handleContactOwner}
+                text="Contact"
+                style={styles.contactOwnerButton}
+                textStyle={styles.contactOwnerButtonText}
+              />
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Technical specifications</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.specsContainer}
-          >
-            {equipment.power && (
-              <View style={styles.specItem}>
-                <Text style={styles.specValue}>{equipment.power}</Text>
-                <Text style={styles.specLabel}>Power</Text>
-              </View>
-            )}
-            {equipment.fuelType && (
-              <View style={styles.specItem}>
-                <Text style={styles.specValue}>{equipment.fuelType}</Text>
-                <Text style={styles.specLabel}>Fuel Type</Text>
-              </View>
-            )}
-            {equipment.yearOfManufacture && (
-              <View style={styles.specItem}>
-                <Text style={styles.specValue}>
-                  {equipment.yearOfManufacture}
-                </Text>
-                <Text style={styles.specLabel}>Year</Text>
-              </View>
-            )}
-            {equipment.transmissionType && (
-              <View style={styles.specItem}>
-                <Text style={styles.specValue}>
-                  {equipment.transmissionType}
-                </Text>
-                <Text style={styles.specLabel}>Transmission</Text>
-              </View>
-            )}
-            {equipment.condition && (
-              <View style={styles.specItem}>
-                <Text style={styles.specValue}>{equipment.condition}</Text>
-                <Text style={styles.specLabel}>Condition</Text>
-              </View>
-            )}
-          </ScrollView>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Technical Specifications</Text>
+            <View style={styles.specsGrid}>
+              {specifications.map((spec, index) => (
+                <View
+                  key={index}
+                  style={[styles.specItem, { width: itemWidth }]}
+                >
+                  <Text style={styles.specLabel}>{spec.label}</Text>
+                  <Text style={styles.specValue}>{spec.value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Description</Text>
@@ -284,15 +289,21 @@ export default function EquipmentDetails() {
 
       <View style={styles.bottomBar}>
         <View style={styles.priceFooter}>
-          <Text style={styles.priceFrom_bottomBar}>from</Text>
+          <Text style={styles.priceFrom_bottomBar}>
+            {listing.listingType === 'rent' ? 'from' : 'Price'}
+          </Text>
           <Text style={styles.price_bottomBar}>
             ${listing.price?.toFixed(2) || 'N/A'}
           </Text>
-          <Text style={styles.priceUnit_bottomBar}> / day</Text>
+          {listing.listingType === 'rent' && (
+            <Text style={styles.priceUnit_bottomBar}>
+              /{listing.rentalUnit || 'day'}
+            </Text>
+          )}
         </View>
         <Button
           onPress={handleBookingRequest}
-          text="Book Now"
+          text={listing.listingType === 'rent' ? 'Book Now' : 'Make Offer'}
           style={styles.bookNowButton}
           textStyle={styles.bookNowButtonText}
         />
@@ -320,7 +331,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   scrollContent: {
-    paddingBottom: 90,
+    paddingBottom: 110, // Increased padding to accommodate larger bottom bar and ensure content isn't cut off
   },
   header: {
     flexDirection: 'row',
@@ -366,6 +377,7 @@ const styles = StyleSheet.create({
     height: 250,
     marginTop: Platform.OS === 'android' ? 35 + 10 : 45 + 10,
     zIndex: -1,
+    marginBottom: 12, // Added spacing below image
   },
   image: {
     width: '100%',
@@ -375,49 +387,51 @@ const styles = StyleSheet.create({
     backgroundColor: BACKGROUND_LIGHT_GREY,
     borderTopLeftRadius: BORDER_RADIUS,
     borderTopRightRadius: BORDER_RADIUS,
-    marginTop: -BORDER_RADIUS,
+    // Removed marginTop: -BORDER_RADIUS to prevent content overlap with image
     paddingHorizontal: 18,
     paddingVertical: 18,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: BORDER_GREY,
+    // Removed top borders as the card starts below the image now
   },
   name: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 20,
+    fontSize: 24, // Slightly larger font for name
     color: TEXT_PRIMARY_DARK,
-    marginBottom: 4,
+    marginBottom: 8, // Increased spacing
   },
-  carRating: {
+  equipmentRating: {
+    // Renamed from carRating for clarity
     fontFamily: 'Archivo-Regular',
     fontSize: 14,
     color: TEXT_SECONDARY_GREY,
-    marginBottom: 20,
+    marginBottom: 16, // Increased spacing
+  },
+  ownerInfoCard: {
+    // New style for the owner section container
+    paddingVertical: 16, // Increased padding
+    marginBottom: 24, // Increased spacing
   },
   ownerInfoContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 0,
-    paddingVertical: 0,
-    borderColor: 'transparent',
   },
   ownerImage: {
-    width: 45,
-    height: 45,
-    borderRadius: 10.5,
-    marginRight: 12,
-    borderWidth: 1,
+    width: 60, // Larger image
+    height: 60, // Larger image
+    borderRadius: 30, // Make it perfectly circular
+    marginRight: 16, // Increased spacing
+    borderWidth: 2, // Thicker border
     borderColor: BORDER_GREY,
   },
   ownerDetails: {
     flex: 1,
+    marginRight: 10, // Added margin for button
   },
   ownerName: {
-    fontFamily: 'Archivo-Medium',
-    fontSize: 16,
+    fontFamily: 'Archivo-Bold', // Make owner name bold
+    fontSize: 18, // Larger font
     color: TEXT_PRIMARY_DARK,
+    marginBottom: 4,
   },
   ownerRating: {
     flexDirection: 'row',
@@ -426,70 +440,74 @@ const styles = StyleSheet.create({
   },
   starIcon: {
     color: '#F59E0B',
-    fontSize: 14,
-    marginRight: 2,
+    fontSize: 16, // Slightly larger star
+    marginRight: 4,
   },
   ratingText: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 13,
+    fontSize: 14, // Slightly larger rating text
     color: TEXT_SECONDARY_GREY,
   },
-  contactOwnerText: {
+  contactOwnerButton: {
+    // Style for the contact button within the owner card
+    backgroundColor: MAIN_COLOR,
+    borderRadius: BORDER_RADIUS,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+  },
+  contactOwnerButtonText: {
     fontFamily: 'Archivo-Medium',
     fontSize: 14,
-    color: MAIN_COLOR,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    color: HEADER_TEXT_COLOR,
   },
   sectionTitle: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 16,
+    fontSize: 18, // Larger section titles
     color: TEXT_PRIMARY_DARK,
-    marginBottom: 10,
-    marginTop: 0,
+    marginBottom: 12, // Increased spacing
   },
-  specsContainer: {
+  specsGrid: {
     flexDirection: 'row',
-    paddingVertical: 6,
-    marginBottom: 20,
-    paddingHorizontal: 0,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 16, // Spacing below the grid
   },
   specItem: {
     backgroundColor: CARD_BACKGROUND,
     borderRadius: BORDER_RADIUS,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12, // Adjusted padding
     paddingVertical: 10,
-    marginRight: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 100,
+    marginBottom: SPEC_ITEM_MARGIN, // Spacing between rows
     borderWidth: 1,
     borderColor: BORDER_GREY,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   specValue: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 15,
+    fontSize: 16, // Larger spec value
     color: TEXT_PRIMARY_DARK,
-    marginBottom: 2,
+    marginBottom: 4, // Spacing between value and label
   },
   specLabel: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 12,
+    fontSize: 13, // Larger spec label
     color: TEXT_SECONDARY_GREY,
+    textAlign: 'center',
   },
   section: {
-    marginBottom: 16,
+    marginBottom: 24, // Increased spacing between sections
     backgroundColor: CARD_BACKGROUND,
     borderRadius: BORDER_RADIUS,
     borderWidth: 1,
     borderColor: BORDER_GREY,
-    padding: 12,
+    padding: 16, // Increased padding within sections
   },
   description: {
     fontFamily: 'Archivo-Regular',
     fontSize: 15,
     color: TEXT_SECONDARY_GREY,
-    lineHeight: 22,
+    lineHeight: 24, // Increased line height for readability
   },
   availabilityList: {
     marginTop: 10,
@@ -499,8 +517,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Regular',
     fontSize: 14,
     color: TEXT_PRIMARY_DARK,
-    marginBottom: 8,
-    lineHeight: 20,
+    marginBottom: 6, // Slightly reduced margin for tighter list
+    lineHeight: 22, // Adjusted line height
   },
   bottomBar: {
     position: 'absolute',
@@ -512,7 +530,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: MAIN_COLOR,
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 18, // Increased vertical padding
     borderTopLeftRadius: BORDER_RADIUS * 2,
     borderTopRightRadius: BORDER_RADIUS * 2,
     borderTopWidth: 1,
@@ -524,27 +542,27 @@ const styles = StyleSheet.create({
   },
   priceFrom_bottomBar: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 13,
+    fontSize: 14, // Slightly larger
     color: HEADER_TEXT_COLOR,
-    marginRight: 3,
+    marginRight: 4, // Increased margin
   },
   price_bottomBar: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 24,
+    fontSize: 26, // Larger price
     color: HEADER_TEXT_COLOR,
   },
   priceUnit_bottomBar: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 13,
+    fontSize: 14, // Slightly larger
     color: HEADER_TEXT_COLOR,
-    marginLeft: 2,
+    marginLeft: 4, // Increased margin
   },
   bookNowButton: {
     backgroundColor: CARD_BACKGROUND,
     borderRadius: BORDER_RADIUS,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    minWidth: 120,
+    paddingVertical: 14, // Increased vertical padding
+    paddingHorizontal: 28, // Increased horizontal padding
+    minWidth: 130, // Increased min-width
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -552,7 +570,7 @@ const styles = StyleSheet.create({
   },
   bookNowButtonText: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 16,
+    fontSize: 17, // Slightly larger font
     color: MAIN_COLOR,
   },
 });
