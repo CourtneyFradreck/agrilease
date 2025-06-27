@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
-  Text, // Ensure Text is imported
+  Text,
   StyleSheet,
   ScrollView,
   Alert,
@@ -25,11 +25,11 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { db } from '@/FirebaseConfig';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { Timestamp } from 'firebase/firestore';
 
 import {
   EquipmentSchema,
   ListingSchema,
-  UserSchema,
   BookingSchema,
 } from '@/utils/validators';
 import { z } from 'zod';
@@ -42,11 +42,8 @@ interface DayPressEvent {
   timestamp: number;
 }
 
-// Define specific types from Zod schemas for clarity
 type Equipment = z.infer<typeof EquipmentSchema>;
 type Listing = z.infer<typeof ListingSchema>;
-type UserProfile = z.infer<typeof UserSchema>;
-type Booking = z.infer<typeof BookingSchema>;
 
 LocaleConfig.locales['en'] = {
   monthNames: [
@@ -114,8 +111,8 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [startDate, setStartDate] = useState<Timestamp | null>(null);
+  const [endDate, setEndDate] = useState<Timestamp | null>(null);
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
 
@@ -138,9 +135,23 @@ export default function BookingPage() {
           setLoading(false);
           return;
         }
+
+        const listingData = listingSnap.data();
         const parsedListing = ListingSchema.parse({
-          ...listingSnap.data(),
+          ...listingData,
           id: listingSnap.id,
+          availabilityStartDate:
+            listingData.availabilityStartDate instanceof Date
+              ? Timestamp.fromDate(listingData.availabilityStartDate)
+              : listingData.availabilityStartDate,
+          availabilityEndDate:
+            listingData.availabilityEndDate instanceof Date
+              ? Timestamp.fromDate(listingData.availabilityEndDate)
+              : listingData.availabilityEndDate,
+          createdAt:
+            listingData.createdAt instanceof Date
+              ? Timestamp.fromDate(listingData.createdAt)
+              : listingData.createdAt,
         });
         setListing(parsedListing);
 
@@ -152,13 +163,17 @@ export default function BookingPage() {
           setLoading(false);
           return;
         }
+        const equipmentData = equipmentSnap.data();
         const parsedEquipment = EquipmentSchema.parse({
-          ...equipmentSnap.data(),
+          ...equipmentData,
           id: equipmentSnap.id,
+          lastUpdatedAt:
+            equipmentData.lastUpdatedAt instanceof Date
+              ? Timestamp.fromDate(equipmentData.lastUpdatedAt)
+              : equipmentData.lastUpdatedAt,
         });
         setEquipment(parsedEquipment);
       } catch (e) {
-        console.error('Error fetching listing or equipment: ', e);
         if (e instanceof z.ZodError) {
           setError(
             `Data validation error: ${e.errors.map((err) => err.message).join(', ')}`,
@@ -176,19 +191,30 @@ export default function BookingPage() {
 
   const handleDayPress = useCallback(
     (day: DayPressEvent) => {
-      const selectedMoment = dayjs(day.dateString);
+      const selectedTimestamp = Timestamp.fromDate(
+        dayjs(day.dateString).toDate(),
+      );
 
-      if (!startDate || selectedMoment.isBefore(dayjs(startDate), 'day')) {
-        setStartDate(selectedMoment.toDate());
+      if (
+        !startDate ||
+        dayjs(selectedTimestamp.toDate()).isBefore(
+          dayjs(startDate.toDate()),
+          'day',
+        )
+      ) {
+        setStartDate(selectedTimestamp);
         setEndDate(null);
       } else if (
         startDate &&
         !endDate &&
-        selectedMoment.isSameOrAfter(dayjs(startDate), 'day')
+        dayjs(selectedTimestamp.toDate()).isSameOrAfter(
+          dayjs(startDate.toDate()),
+          'day',
+        )
       ) {
-        setEndDate(selectedMoment.toDate());
+        setEndDate(selectedTimestamp);
       } else if (startDate && endDate) {
-        setStartDate(selectedMoment.toDate());
+        setStartDate(selectedTimestamp);
         setEndDate(null);
       }
     },
@@ -197,7 +223,8 @@ export default function BookingPage() {
 
   const rentalDays = useMemo(() => {
     if (startDate && endDate) {
-      const diffDays = dayjs(endDate).diff(dayjs(startDate), 'day') + 1;
+      const diffDays =
+        dayjs(endDate.toDate()).diff(dayjs(startDate.toDate()), 'day') + 1;
       return Math.max(1, diffDays);
     }
     return 0;
@@ -222,7 +249,7 @@ export default function BookingPage() {
       Alert.alert('Missing Dates', 'Please select both start and end dates.');
       return;
     }
-    if (dayjs(endDate).isBefore(dayjs(startDate), 'day')) {
+    if (dayjs(endDate.toDate()).isBefore(dayjs(startDate.toDate()), 'day')) {
       Alert.alert(
         'Invalid Dates',
         'End date cannot be earlier than start date.',
@@ -237,10 +264,10 @@ export default function BookingPage() {
         listingId: listing.id as string,
         renterId: currentUserId,
         ownerId: listing.ownerId,
-        startDate: startDate.getTime(),
-        endDate: endDate.getTime(),
+        startDate: startDate,
+        endDate: endDate,
         totalPrice: parseFloat(totalPrice.toFixed(2)),
-        bookingDate: Date.now(),
+        bookingDate: Timestamp.now(),
         status: 'pending',
       };
 
@@ -259,7 +286,6 @@ export default function BookingPage() {
         ],
       );
     } catch (error: any) {
-      console.error('Failed to create booking:', error);
       if (error instanceof z.ZodError) {
         Alert.alert(
           'Validation Error',
@@ -299,23 +325,23 @@ export default function BookingPage() {
     };
 
     if (startDate && endDate) {
-      let currentDate = dayjs(startDate);
-      while (currentDate.isSameOrBefore(dayjs(endDate), 'day')) {
+      let currentDate = dayjs(startDate.toDate());
+      while (currentDate.isSameOrBefore(dayjs(endDate.toDate()), 'day')) {
         const dateString = currentDate.format('YYYY-MM-DD');
         dates[dateString] = {
           color: CALENDAR_RANGE_BG,
           textColor: TEXT_PRIMARY_DARK,
-          startingDay: currentDate.isSame(dayjs(startDate), 'day'),
-          endingDay: currentDate.isSame(dayjs(endDate), 'day'),
+          startingDay: currentDate.isSame(dayjs(startDate.toDate()), 'day'),
+          endingDay: currentDate.isSame(dayjs(endDate.toDate()), 'day'),
           customStyles: {
             container: {
               backgroundColor: CALENDAR_RANGE_BG,
               borderRadius: 0,
-              ...(currentDate.isSame(dayjs(startDate), 'day') && {
+              ...(currentDate.isSame(dayjs(startDate.toDate()), 'day') && {
                 borderTopLeftRadius: BORDER_RADIUS / 2,
                 borderBottomLeftRadius: BORDER_RADIUS / 2,
               }),
-              ...(currentDate.isSame(dayjs(endDate), 'day') && {
+              ...(currentDate.isSame(dayjs(endDate.toDate()), 'day') && {
                 borderTopRightRadius: BORDER_RADIUS / 2,
                 borderBottomRightRadius: BORDER_RADIUS / 2,
               }),
@@ -328,7 +354,7 @@ export default function BookingPage() {
         currentDate = currentDate.add(1, 'day');
       }
     } else if (startDate) {
-      const dateString = dayjs(startDate).format('YYYY-MM-DD');
+      const dateString = dayjs(startDate.toDate()).format('YYYY-MM-DD');
       dates[dateString] = {
         selected: true,
         startingDay: true,
@@ -392,12 +418,11 @@ export default function BookingPage() {
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Confirm Booking</Text>
-          {/* Header description consistent with EquipmentDetails */}
           <Text style={styles.headerDescription}>
             Finalize your rental request
           </Text>
         </View>
-        <View style={{ width: 24 }} /> {/* Spacer to balance header */}
+        <View style={{ width: 24 }} />
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -409,11 +434,8 @@ export default function BookingPage() {
           </Text>
         </View>
 
-        {/* Select Dates Section */}
         <View style={styles.sectionContainer}>
-          {/* Renamed for consistency */}
           <View style={styles.sectionTitleContainer}>
-            {/* Added for consistent title/subtitle group */}
             <MaterialIcons name="calendar-today" size={22} color={MAIN_COLOR} />
             <Text style={styles.sectionTitle}>Select Rental Dates</Text>
           </View>
@@ -422,16 +444,16 @@ export default function BookingPage() {
             onPress={() => setIsCalendarVisible(true)}
             accessibilityLabel={
               startDate && endDate
-                ? `Selected dates from ${dayjs(startDate).format(
+                ? `Selected dates from ${dayjs(startDate.toDate()).format(
                     'MMM D',
-                  )} to ${dayjs(endDate).format('MMM D')}`
+                  )} to ${dayjs(endDate.toDate()).format('MMM D')}`
                 : 'Select rental dates'
             }
           >
             <Text style={styles.selectDatesButtonText}>
               {startDate && endDate
-                ? `${dayjs(startDate).format('MMM D, YYYY')} - ${dayjs(
-                    endDate,
+                ? `${dayjs(startDate.toDate()).format('MMM D, YYYY')} - ${dayjs(
+                    endDate.toDate(),
                   ).format('MMM D, YYYY')}`
                 : 'Tap to select dates'}
             </Text>
@@ -443,11 +465,8 @@ export default function BookingPage() {
           </TouchableOpacity>
         </View>
 
-        {/* Rental Summary Section */}
         <View style={styles.sectionContainer}>
-          {/* Renamed for consistency */}
           <View style={styles.sectionTitleContainer}>
-            {/* Added for consistent title/subtitle group */}
             <Text style={styles.sectionTitle}>Rental Summary</Text>
           </View>
           <View style={styles.summaryGrid}>
@@ -470,11 +489,8 @@ export default function BookingPage() {
           </View>
         </View>
 
-        {/* Booking Policies Section */}
         <View style={styles.sectionContainer}>
-          {/* Renamed for consistency */}
           <View style={styles.sectionTitleContainer}>
-            {/* Added for consistent title/subtitle group */}
             <Text style={styles.sectionTitle}>Booking Policies</Text>
           </View>
           <View style={styles.policyList}>
@@ -592,8 +608,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16, // Consistent padding
-    paddingTop: 30, // Increased paddingTop for header
+    paddingHorizontal: 16,
+    paddingTop: 30,
     paddingBottom: 10,
     backgroundColor: MAIN_COLOR,
     position: 'absolute',
@@ -601,14 +617,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    borderBottomWidth: 1, // Consistent border
+    borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.2)',
   },
   backButton: {
-    padding: 6, // Consistent padding
+    padding: 6,
   },
   headerTitleContainer: {
-    // New style for consistency
     flex: 1,
     alignItems: 'flex-start',
     marginLeft: 10,
@@ -620,7 +635,6 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   headerDescription: {
-    // New style for consistency
     fontFamily: 'Archivo-Regular',
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.8)',
@@ -646,12 +660,12 @@ const styles = StyleSheet.create({
   },
   equipmentSummary: {
     backgroundColor: CARD_BACKGROUND,
-    padding: 18, // Consistent padding
-    marginBottom: 20, // Consistent spacing between sections
-    marginTop: 0, // No top margin here, handled by scrollContent paddingTop
+    padding: 18,
+    marginBottom: 20,
+    marginTop: 0,
     borderRadius: BORDER_RADIUS,
-    marginHorizontal: 18, // Consistent horizontal margin
-    borderWidth: 1, // Consistent border
+    marginHorizontal: 18,
+    borderWidth: 1,
     borderColor: BORDER_GREY,
   },
   summaryTitle: {
@@ -659,44 +673,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: TEXT_SECONDARY_GREY,
     marginBottom: 4,
-    textAlign: 'left', // Ensure left alignment
+    textAlign: 'left',
   },
   equipmentName: {
     fontFamily: 'Archivo-Bold',
     fontSize: 20,
     color: TEXT_PRIMARY_DARK,
     marginBottom: 4,
-    textAlign: 'left', // Ensure left alignment
+    textAlign: 'left',
   },
   equipmentPrice: {
     fontFamily: 'Archivo-Medium',
     fontSize: 16,
     color: MAIN_COLOR,
-    textAlign: 'left', // Ensure left alignment
+    textAlign: 'left',
   },
   sectionContainer: {
-    // New style for all major sections for consistency
-    backgroundColor: CARD_BACKGROUND, // Card background
-    padding: 18, // Consistent padding
-    marginBottom: 20, // Space between sections
-    marginHorizontal: 18, // Consistent horizontal margin
+    backgroundColor: CARD_BACKGROUND,
+    padding: 18,
+    marginBottom: 20,
+    marginHorizontal: 18,
     borderRadius: BORDER_RADIUS,
-    borderWidth: 1, // Consistent border
+    borderWidth: 1,
     borderColor: BORDER_GREY,
   },
   sectionTitleContainer: {
-    flexDirection: 'row', // Added to align icon and text
-    alignItems: 'center', // Added to align icon and text
-    marginTop: 0, // No top margin within section card
-    marginBottom: 10, // Space below title/subtitle block
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 0,
+    marginBottom: 10,
   },
   sectionTitle: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 18, // Consistent font size
+    fontSize: 18,
     color: TEXT_PRIMARY_DARK,
     textAlign: 'left',
     marginBottom: 4,
-    marginLeft: 8, // Add some space between icon and text
+    marginLeft: 8,
   },
   selectDatesButton: {
     flexDirection: 'row',
@@ -713,7 +726,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Medium',
     fontSize: 15,
     color: TEXT_PRIMARY_DARK,
-    textAlign: 'left', // Ensure left alignment
+    textAlign: 'left',
   },
   summaryGrid: {
     flexDirection: 'row',
@@ -724,26 +737,26 @@ const styles = StyleSheet.create({
   summaryGridItem: {
     width: '48%',
     backgroundColor: BACKGROUND_LIGHT_GREY,
-    borderRadius: BORDER_RADIUS, // Consistent border radius
+    borderRadius: BORDER_RADIUS,
     padding: 12,
     marginBottom: 10,
-    borderWidth: 1, // Consistent border
+    borderWidth: 1,
     borderColor: BORDER_GREY,
     justifyContent: 'space-between',
-    alignItems: 'flex-start', // Ensure left alignment
+    alignItems: 'flex-start',
   },
   summaryItemLabel: {
     fontFamily: 'Archivo-Regular',
     fontSize: 13,
     color: TEXT_SECONDARY_GREY,
     marginBottom: 4,
-    textAlign: 'left', // Ensure left alignment
+    textAlign: 'left',
   },
   summaryItemValue: {
     fontFamily: 'Archivo-Medium',
     fontSize: 15,
     color: TEXT_PRIMARY_DARK,
-    textAlign: 'left', // Ensure left alignment
+    textAlign: 'left',
   },
   summaryTotalItem: {
     width: '100%',
@@ -751,19 +764,19 @@ const styles = StyleSheet.create({
     borderColor: MAIN_COLOR,
     borderWidth: 2,
     marginTop: 5,
-    alignItems: 'flex-start', // Ensure left alignment
+    alignItems: 'flex-start',
   },
   summaryTotalLabel: {
     fontFamily: 'Archivo-Bold',
     fontSize: 16,
     color: TEXT_PRIMARY_DARK,
-    textAlign: 'left', // Ensure left alignment
+    textAlign: 'left',
   },
   summaryTotalValue: {
     fontFamily: 'Archivo-Bold',
     fontSize: 20,
     color: MAIN_COLOR,
-    textAlign: 'left', // Ensure left alignment
+    textAlign: 'left',
   },
   policyList: {
     marginTop: 10,
@@ -774,7 +787,7 @@ const styles = StyleSheet.create({
     color: TEXT_PRIMARY_DARK,
     marginBottom: 8,
     lineHeight: 20,
-    textAlign: 'left', // Ensure left alignment
+    textAlign: 'left',
   },
   bottomBar: {
     position: 'absolute',
@@ -787,8 +800,8 @@ const styles = StyleSheet.create({
     backgroundColor: MAIN_COLOR,
     paddingHorizontal: 20,
     paddingVertical: 15,
-    borderTopLeftRadius: BORDER_RADIUS, // Consistent radius
-    borderTopRightRadius: BORDER_RADIUS, // Consistent radius
+    borderTopLeftRadius: BORDER_RADIUS,
+    borderTopRightRadius: BORDER_RADIUS,
   },
   priceFooter: {
     flexDirection: 'row',
