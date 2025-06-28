@@ -1,89 +1,146 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { Link, router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/Button';
+
+const BORDER_RADIUS = 8;
+const MAIN_COLOR = '#4D7C0F';
+const TEXT_PRIMARY_DARK = '#1F2937';
+const TEXT_SECONDARY_GREY = '#6B7280';
+const BACKGROUND_LIGHT_GREY = '#F9FAFB';
+const CARD_BACKGROUND = '#FFFFFF';
+const BORDER_GREY = '#E0E0E0';
+const WARNING_COLOR = '#DC2626';
+const HEADER_TEXT_COLOR = '#FFFFFF';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
 
   const handleLogin = async () => {
-    setError(null); // Clear previous errors
+    setError(null);
     if (!email || !password) {
-      setError('Please enter both email and password');
+      setError('Please enter both email and password.');
       return;
     }
-    
+
+    setIsSubmitting(true);
     try {
       const success = await login(email, password);
       if (success) {
         router.replace('/(tabs)');
       } else {
-        // More specific error handling can be done here based on the actual error from login function
         setError('Invalid email or password. Please check your credentials.');
       }
-    } catch (err: any) { // Catch any unexpected errors
-      console.error("Login component caught error:", err);
+    } catch (err: any) {
+      console.error('Login component caught error:', err);
       setError('An unexpected error occurred during login. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.logoContainer}>
-          <Image 
-            source={{ uri: 'https://images.pexels.com/photos/2933243/pexels-photo-2933243.jpeg' }} 
+          <Image
+            source={{
+              uri: 'https://images.pexels.com/photos/2933243/pexels-photo-2933243.jpeg',
+            }}
             style={styles.logoBackground}
           />
           <View style={styles.logoOverlay}>
             <Text style={styles.logoText}>AgriLease</Text>
-            <Text style={styles.tagline}>Farm Equipment Rental Marketplace</Text>
+            <Text style={styles.tagline}>
+              Farm Equipment Rental Marketplace
+            </Text>
           </View>
         </View>
-        
+
         <View style={styles.formContainer}>
           <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.descriptionText}>
+            Sign in to access your account and manage your equipment listings or
+            rentals.
+          </Text>
+
           {error && <Text style={styles.errorText}>{error}</Text>}
-          
+
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email</Text>
             <TextInput
               style={styles.input}
               placeholder="Enter your email"
-              placeholderTextColor="#A3A3A3"
+              placeholderTextColor={TEXT_SECONDARY_GREY}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!isSubmitting}
             />
           </View>
-          
+
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Password</Text>
             <TextInput
               style={styles.input}
               placeholder="Enter your password"
-              placeholderTextColor="#A3A3A3"
+              placeholderTextColor={TEXT_SECONDARY_GREY}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              editable={!isSubmitting}
             />
           </View>
-          
-          <Button onPress={handleLogin} text="Sign In" style={styles.loginButton} />
-          
+
+          <Button
+            onPress={handleLogin}
+            text={isSubmitting ? 'Signing In...' : 'Sign In'}
+            style={styles.loginButton}
+            disabled={isSubmitting}
+          />
+
+          {isSubmitting && (
+            <View style={styles.submittingContainer}>
+              <ActivityIndicator size="small" color={MAIN_COLOR} />
+              <Text style={styles.submittingText}>
+                Authenticating, please wait...
+              </Text>
+            </View>
+          )}
+
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>Don't have an account? </Text>
             <Link href="/register" asChild>
-              <TouchableOpacity>
-                <Text style={styles.registerLink}>Register</Text>
+              <TouchableOpacity disabled={isSubmitting}>
+                <Text
+                  style={[
+                    styles.registerLink,
+                    isSubmitting && styles.disabledLink,
+                  ]}
+                >
+                  Register
+                </Text>
               </TouchableOpacity>
             </Link>
           </View>
@@ -96,13 +153,14 @@ export default function Login() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: BACKGROUND_LIGHT_GREY,
   },
   scrollContainer: {
     flexGrow: 1,
+    justifyContent: 'center',
   },
   logoContainer: {
-    height: 250,
+    height: 220,
     position: 'relative',
   },
   logoBackground: {
@@ -116,76 +174,114 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   logoText: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 36,
-    color: '#FFFFFF',
-    marginBottom: 8,
+    fontFamily: 'Archivo-Bold',
+    fontSize: 38,
+    color: HEADER_TEXT_COLOR,
+    marginBottom: 6,
   },
   tagline: {
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Archivo-Regular',
     fontSize: 16,
-    color: '#FFFFFF',
+    color: HEADER_TEXT_COLOR,
+    textAlign: 'center', // Changed to center for better visual balance
+    paddingHorizontal: 20,
   },
   formContainer: {
     flex: 1,
     padding: 24,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -20,
+    backgroundColor: CARD_BACKGROUND,
+    borderTopLeftRadius: BORDER_RADIUS * 2,
+    borderTopRightRadius: BORDER_RADIUS * 2,
+    marginTop: -30,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    borderWidth: 0,
   },
   title: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 24,
-    color: '#333333',
+    fontFamily: 'Archivo-SemiBold', // Less bold as requested
+    fontSize: 28,
+    color: TEXT_PRIMARY_DARK,
+    marginBottom: 8,
+    textAlign: 'left',
+  },
+  descriptionText: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 14,
+    color: TEXT_SECONDARY_GREY,
+    textAlign: 'left',
     marginBottom: 24,
   },
   errorText: {
-    fontFamily: 'Inter-Regular',
-    color: '#DC2626',
+    fontFamily: 'Archivo-Regular',
+    color: WARNING_COLOR,
     marginBottom: 16,
+    textAlign: 'center',
   },
   inputContainer: {
     marginBottom: 20,
   },
   label: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    color: '#4B5563',
+    fontFamily: 'Archivo-Medium',
+    fontSize: 15,
+    color: TEXT_PRIMARY_DARK,
     marginBottom: 8,
   },
   input: {
-    height: 56,
+    height: 52, // Retained original height
     borderWidth: 1,
-    borderColor: '#E5E5E5',
-    borderRadius: 8,
+    borderColor: BORDER_GREY,
+    borderRadius: BORDER_RADIUS,
     paddingHorizontal: 16,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Archivo-Regular',
     fontSize: 16,
-    color: '#333333',
-    backgroundColor: '#F9FAFB',
+    color: TEXT_PRIMARY_DARK,
+    backgroundColor: BACKGROUND_LIGHT_GREY,
   },
   loginButton: {
-    marginTop: 8,
+    marginTop: 10,
+    backgroundColor: MAIN_COLOR,
+    borderRadius: BORDER_RADIUS,
+    paddingVertical: 15, // Adjusted to match register form button padding
+    height: 54, // Ensured consistent height with register form buttons
+  },
+  submittingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 15,
+    width: '100%',
+  },
+  submittingText: {
+    marginLeft: 10,
+    fontFamily: 'Archivo-Regular',
+    fontSize: 14,
+    color: TEXT_SECONDARY_GREY,
   },
   registerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 30,
   },
   registerText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: '#4B5563',
+    fontFamily: 'Archivo-Regular',
+    fontSize: 15,
+    color: TEXT_SECONDARY_GREY,
   },
   registerLink: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 16,
-    color: '#4D7C0F',
+    fontFamily: 'Archivo-Medium',
+    fontSize: 15,
+    color: MAIN_COLOR,
+    textDecorationLine: 'underline',
+  },
+  disabledLink: {
+    opacity: 0.5,
   },
 });
