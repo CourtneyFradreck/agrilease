@@ -1,60 +1,52 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, getDocs } from 'firebase/firestore';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+import { getAnalytics, isSupported } from 'firebase/analytics';
+import { initializeApp } from 'firebase/app';
+import { Auth, getAuth, initializeAuth } from 'firebase/auth';
+import { addDoc, collection, getFirestore } from 'firebase/firestore';
 import { Platform } from 'react-native';
 
-// Import Auth, but not the persistence function yet
-import { initializeAuth, getAuth, Auth } from "firebase/auth"; 
-
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
-import { getAnalytics, isSupported } from "firebase/analytics";
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-// Not sure if these are supposed to be public, but they are needed for Firebase to work
-const firebaseConfig = {
-  apiKey: "AIzaSyCENPFsckjW3Jem0e6srw1QQ31fcJ7TW-I",
-  authDomain: "agrilease-37add.firebaseapp.com",
-  projectId: "agrilease-37add",
-  storageBucket: "agrilease-37add.firebasestorage.app",
-  messagingSenderId: "410364585643",
-  appId: "1:410364585643:web:d9ca02802f8a06907879ee",
-  measurementId: "G-LL4BP62G5H"
+export const firebaseConfig = {
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- THE FIX: Conditionally initialize Auth for Native vs. Web ---
 let auth: Auth;
 
 if (Platform.OS === 'web') {
-    // For web, we use getAuth
-    auth = getAuth(app);
+  auth = getAuth(app);
 } else {
-    const { getReactNativePersistence } = require('firebase/auth');
-    auth = initializeAuth(app, {
-        persistence: getReactNativePersistence(ReactNativeAsyncStorage),
-    });
+  const { getReactNativePersistence } = require('firebase/auth');
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+  });
 }
-// -------------------------------------------------------------------
 
 let analytics;
 if (Platform.OS !== 'web') {
-    isSupported().then(supported => {
-        if (supported) {
-            analytics = getAnalytics(app);
-        }
-    });
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
+    }
+  });
 } else {
-    analytics = getAnalytics(app);
+  analytics = getAnalytics(app);
 }
 
-// Test function
 export async function testDatabaseConnection() {
   try {
     const testCollection = collection(db, 'test');
-    const testDoc = await addDoc(testCollection, { message: 'Test connection', timestamp: new Date() });
+    const testDoc = await addDoc(testCollection, {
+      message: 'Test connection',
+      timestamp: new Date(),
+    });
     console.log('Test document written with ID: ', testDoc.id);
     return true;
   } catch (error) {
@@ -63,4 +55,4 @@ export async function testDatabaseConnection() {
   }
 }
 
-export { db, auth, analytics };
+export { analytics, auth, db };
