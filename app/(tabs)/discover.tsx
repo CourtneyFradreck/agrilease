@@ -16,6 +16,8 @@ import { Feather } from '@expo/vector-icons';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { useRouter } from 'expo-router';
 import { FilterModal } from '@/components/FilterModal';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -310,14 +312,47 @@ export default function Discover() {
   const [mapIsInteracting, setMapIsInteracting] = useState(false);
 
   const [mapRegion, setMapRegion] = useState({
-    latitude: -17.825166,
-    longitude: 31.03351,
+    latitude: -17.825166, // Default fallback
+    longitude: 31.03351,  // Default fallback
     latitudeDelta: LATITUDE_DELTA,
     longitudeDelta: LONGITUDE_DELTA,
   });
+  const [loadingLocation, setLoadingLocation] = useState(true);
 
   const animatedOpacity = useRef(new Animated.Value(1)).current;
   const animatedTranslateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const fetchUserLocation = async () => {
+      try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) return;
+        const db = getFirestore();
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (
+            userData.location &&
+            typeof userData.location.latitude === 'number' &&
+            typeof userData.location.longitude === 'number'
+          ) {
+            setMapRegion((prev) => ({
+              ...prev,
+              latitude: userData.location.latitude,
+              longitude: userData.location.longitude,
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user location:', error);
+      } finally {
+        setLoadingLocation(false);
+      }
+    };
+    fetchUserLocation();
+  }, []);
 
   useEffect(() => {
     if (mapIsInteracting) {
@@ -366,6 +401,14 @@ export default function Discover() {
           item.type.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : mockNearbyEquipment;
+
+  if (loadingLocation) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading map...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

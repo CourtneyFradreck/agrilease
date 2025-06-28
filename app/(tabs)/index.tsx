@@ -20,6 +20,8 @@ import { ListingCard } from '@/components/ListingCard';
 import { EquipmentSchema, ListingSchema } from '@/utils/validators';
 import { z } from 'zod';
 import { useFocusEffect } from '@react-navigation/native';
+import { getAuth } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 type EquipmentFromDB = z.infer<typeof EquipmentSchema>;
 type ListingFromDB = z.infer<typeof ListingSchema>;
@@ -53,6 +55,14 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    address?: string;
+    region?: string;
+  }>({
+    address: undefined,
+    region: undefined,
+  });
+  const [locationLoading, setLocationLoading] = useState(true);
 
   const categories = [
     'Tractor',
@@ -207,6 +217,32 @@ export default function Dashboard() {
     fetchListingsData();
   }, [fetchListingsData]);
 
+  useEffect(() => {
+    const fetchUserLocation = async () => {
+      try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) return;
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.location) {
+            setUserLocation({
+              address: userData.location.address,
+              region: userData.location.region,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user location:', error);
+      } finally {
+        setLocationLoading(false);
+      }
+    };
+    fetchUserLocation();
+  }, []);
+
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
@@ -250,7 +286,17 @@ export default function Dashboard() {
               <View>
                 <Text style={styles.greetingText}>{getGreeting()}</Text>
                 <TouchableOpacity style={styles.locationContainer}>
-                  <Text style={styles.locationText}>Jason Moyo, Harare</Text>
+                  <Text style={styles.locationText}>
+                    {locationLoading
+                      ? 'Loading location...'
+                      : userLocation.address || userLocation.region
+                      ? `${userLocation.address || ''}${
+                          userLocation.address && userLocation.region
+                            ? ', '
+                            : ''
+                        }${userLocation.region || ''}`
+                      : 'Location not set'}
+                  </Text>
                   <Feather
                     name="chevron-down"
                     size={16}
