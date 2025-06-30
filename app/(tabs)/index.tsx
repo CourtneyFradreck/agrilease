@@ -1,25 +1,43 @@
-import { useState, useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  SafeAreaView,
-  Platform,
+  View,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
-import { useData } from '@/context/DataContext';
-import { EquipmentCard } from '@/components/EquipmentCard';
-import { FilterModal } from '@/components/FilterModal';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { db } from '@/FirebaseConfig';
+import { ListingCard } from '@/components/ListingCard';
+import { EquipmentSchema, ListingSchema } from '@/utils/validators';
+import { z } from 'zod';
+import { useFocusEffect } from '@react-navigation/native';
+import { getAuth } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+
+type EquipmentFromDB = z.infer<typeof EquipmentSchema>;
+type ListingFromDB = z.infer<typeof ListingSchema>;
+
+interface HydratedEquipment extends EquipmentFromDB {
+  yearOfManufacture?: z.infer<typeof EquipmentSchema>['yearOfManufacture'];
+}
+
+interface HydratedListing extends ListingFromDB {
+  equipment: HydratedEquipment;
+}
 
 const BORDER_RADIUS = 8;
 const MAIN_COLOR = '#4D7C0F';
 const HEADER_TEXT_COLOR = '#FFFFFF';
-const SLATE_LOCATION_COLOR = '#D1D5DB';
+const LOCATION_COLOR = '#D1D5DB';
 const TEXT_PRIMARY_DARK = '#1F2937';
 const TEXT_SECONDARY_GREY = '#6B7280';
 const BACKGROUND_LIGHT_GREY = '#F9FAFB';
@@ -28,58 +46,141 @@ const BORDER_GREY = '#E5E5E5';
 
 export default function Dashboard() {
   const router = useRouter();
-  const { rentalEquipment } = useData();
+  const [allListings, setAllListings] = useState<HydratedListing[]>([]);
+  const [filteredListings, setFilteredListings] = useState<HydratedListing[]>(
+    [],
+  );
   const [searchQuery, setSearchQuery] = useState('');
-  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
-  const [filteredEquipment, setFilteredEquipment] = useState(rentalEquipment);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-
-  const showDynamicSections = !searchQuery && !activeFilter;
-
-  const featuredEquipmentData = rentalEquipment.slice(0, 4);
-  const newArrivalsData = rentalEquipment.slice(4, 8);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    address?: string;
+    region?: string;
+  }>({
+    address: undefined,
+    region: undefined,
+  });
+  const [locationLoading, setLocationLoading] = useState(true);
 
   const categories = [
-    'Tractors',
-    'Harvesters',
-    'Seeders',
-    'Sprayers',
+    'Tractor',
+    'Harvester',
+    'Seeder',
+    'Sprayer',
     'Tillage',
-    'Loaders',
-    'Plows',
-    'Cultivators',
+    'Loader',
+    'Plow',
+    'Cultivator',
   ];
 
   const getGreeting = () => {
     const currentHour = new Date().getUTCHours() + 2;
-    if (currentHour >= 6 && currentHour < 12) {
-      return 'Good morning';
-    }
-    if (currentHour >= 12 && currentHour < 18) {
-      return 'Good afternoon';
-    }
+    if (currentHour >= 6 && currentHour < 12) return 'Good morning';
+    if (currentHour >= 12 && currentHour < 18) return 'Good afternoon';
     return 'Good evening';
   };
 
+  const fetchListingsData = useCallback(async () => {
+    if (!refreshing) {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const equipmentCollectionRef = collection(db, `equipment`);
+      const equipmentSnapshot = await getDocs(equipmentCollectionRef);
+      const equipments: { [key: string]: EquipmentFromDB } = {};
+
+      equipmentSnapshot.docs.forEach((doc) => {
+        try {
+          const parsedEquipment = EquipmentSchema.parse({
+            id: doc.id,
+            ...doc.data(),
+          });
+          equipments[doc.id] = parsedEquipment;
+        } catch (e) {
+          console.error(`Error parsing equipment ${doc.id}:`, e);
+        }
+      });
+
+      const listingsQuery = query(
+        collection(db, `listings`),
+        orderBy('createdAt', 'desc'),
+        limit(50),
+      );
+      const listingsSnapshot = await getDocs(listingsQuery);
+      const hydratedListings: HydratedListing[] = [];
+
+      for (const doc of listingsSnapshot.docs) {
+        try {
+          const parsedListing = ListingSchema.parse({
+            id: doc.id,
+            ...doc.data(),
+          });
+          const associatedEquipment = equipments[parsedListing.equipmentId];
+
+          if (associatedEquipment) {
+            hydratedListings.push({
+              ...parsedListing,
+              equipment: {
+                ...associatedEquipment,
+              },
+            });
+          } else {
+            console.warn(
+              `Equipment with ID ${parsedListing.equipmentId} not found for listing ${doc.id}`,
+            );
+          }
+        } catch (e) {
+          console.error(`Error parsing listing ${doc.id}:`, e);
+        }
+      }
+
+      setAllListings(hydratedListings);
+      setFilteredListings(hydratedListings);
+    } catch (e) {
+      setError('Failed to fetch data: ' + (e as Error).message);
+      console.error('Firebase fetch error:', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [refreshing]);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Dashboard screen focused, fetching listings...');
+      fetchListingsData();
+
+      return () => {
+        console.log('Dashboard screen unfocused');
+      };
+    }, [fetchListingsData]),
+  );
+
   useEffect(() => {
-    let currentFiltered = rentalEquipment;
+    let currentFiltered = allListings;
 
     if (searchQuery) {
       currentFiltered = currentFiltered.filter(
         (item) =>
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.type.toLowerCase().includes(searchQuery.toLowerCase()),
+          item.equipment.name
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          item.equipment.type.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
 
     if (activeFilter) {
       currentFiltered = currentFiltered.filter(
-        (item) => item.type === activeFilter,
+        (item) =>
+          item.equipment.type.toLowerCase() === activeFilter.toLowerCase(),
       );
     }
 
-    setFilteredEquipment(currentFiltered);
-  }, [searchQuery, activeFilter, rentalEquipment]);
+    setFilteredListings(currentFiltered);
+  }, [searchQuery, activeFilter, allListings]);
 
   const handleCategoryPress = (category: string) => {
     setActiveFilter((prevFilter) =>
@@ -88,7 +189,7 @@ export default function Dashboard() {
   };
 
   const renderCategoryButton = (category: string) => {
-    const isActive = category === activeFilter;
+    const isActive = category.toLowerCase() === activeFilter?.toLowerCase();
 
     return (
       <TouchableOpacity
@@ -100,40 +201,124 @@ export default function Dashboard() {
         <Text
           style={[styles.categoryText, isActive && styles.categoryTextActive]}
         >
-          {category}
+          {category}s
         </Text>
       </TouchableOpacity>
     );
   };
 
+  const handleNotificationPress = () => {
+    console.log('Notification button pressed!');
+    router.push('/notifications');
+  };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchListingsData();
+  }, [fetchListingsData]);
+
+  useEffect(() => {
+    const fetchUserLocation = async () => {
+      try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) return;
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.location) {
+            setUserLocation({
+              address: userData.location.address,
+              region: userData.location.region,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user location:', error);
+      } finally {
+        setLocationLoading(false);
+      }
+    };
+    fetchUserLocation();
+  }, []);
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={MAIN_COLOR} />
+        <Text style={styles.loadingText}>Loading listings...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Error: {error}</Text>
+        <TouchableOpacity
+          onPress={onRefresh}
+          style={{
+            marginTop: 20,
+            padding: 10,
+            borderWidth: 1,
+            borderColor: MAIN_COLOR,
+            borderRadius: BORDER_RADIUS,
+          }}
+        >
+          <Text style={{ color: MAIN_COLOR, fontFamily: 'Archivo-Medium' }}>
+            Tap to Retry
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const listingsToDisplay =
+    searchQuery || activeFilter ? filteredListings : allListings;
+
   return (
     <View style={styles.container}>
-      <View style={styles.headerContainer}>
-        <SafeAreaView style={styles.headerSafeArea}>
-          <View style={styles.headerContentWrapper}>
-            <View style={styles.headerTopRow}>
+      <View style={styles.fixedHeader}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerTop}>
               <View>
-                <Text style={styles.greetingText}>{getGreeting()} </Text>
-                <TouchableOpacity style={styles.locationDropdown}>
+                <Text style={styles.greetingText}>{getGreeting()}</Text>
+                <TouchableOpacity style={styles.locationContainer}>
                   <Text style={styles.locationText}>
-                    Location: Jason Moyo, Harare
+                    {locationLoading
+                      ? 'Loading location...'
+                      : userLocation.address || userLocation.region
+                      ? `${userLocation.address || ''}${
+                          userLocation.address && userLocation.region
+                            ? ', '
+                            : ''
+                        }${userLocation.region || ''}`
+                      : 'Location not set'}
                   </Text>
                   <Feather
                     name="chevron-down"
-                    size={20}
-                    color={SLATE_LOCATION_COLOR}
+                    size={16}
+                    color={LOCATION_COLOR}
                   />
                 </TouchableOpacity>
               </View>
-            </View>
-            <View style={styles.searchAndFilterRow}>
-              <View style={styles.searchInputWrapper}>
-                <Feather
-                  name="search"
+              <TouchableOpacity
+                style={styles.notificationButton}
+                onPress={handleNotificationPress}
+              >
+                <Ionicons
+                  name="notifications-outline"
                   size={20}
-                  color={TEXT_SECONDARY_GREY}
-                  style={styles.searchIcon}
+                  color={MAIN_COLOR}
                 />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchContainer}>
+              <View style={styles.searchInputContainer}>
+                <Feather name="search" size={18} color={TEXT_SECONDARY_GREY} />
                 <TextInput
                   style={styles.searchInput}
                   placeholder="Search equipment..."
@@ -142,120 +327,65 @@ export default function Dashboard() {
                   onChangeText={setSearchQuery}
                 />
               </View>
-              <TouchableOpacity
-                style={styles.filterButton}
-                onPress={() => setIsFilterModalVisible(true)}
-                accessibilityLabel="Open filter options"
-                activeOpacity={0.7}
-              >
-                <Feather name="sliders" size={22} color={MAIN_COLOR} />
+              <TouchableOpacity style={styles.filterButton} activeOpacity={0.7}>
+                <Feather name="sliders" size={18} color={MAIN_COLOR} />
               </TouchableOpacity>
             </View>
           </View>
         </SafeAreaView>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scrollViewContent}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollViewContentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[MAIN_COLOR]}
+            tintColor={MAIN_COLOR}
+          />
+        }
+      >
         <View style={styles.categoriesSection}>
-          <View style={styles.categoriesTitleWrapper}>
-            <Text style={styles.sectionTitle}>Browse Categories</Text>
-          </View>
+          <Text style={styles.categoriesTitle}>Categories</Text>
+          <Text style={styles.categoriesSubtitle}>
+            Browse equipment by type
+          </Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesContent}
+            contentContainerStyle={styles.categoriesScroll}
           >
-            {categories.map((category) => renderCategoryButton(category))}
+            {categories.map(renderCategoryButton)}
           </ScrollView>
         </View>
 
-        {showDynamicSections && featuredEquipmentData.length > 0 && (
-          <View style={styles.contentSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Featured Equipment</Text>
-              <Text style={styles.sectionDescription}>
-                Handpicked, top-rated rentals nearby.
-              </Text>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalCardScroll}
-            >
-              {featuredEquipmentData.map((item) => (
-                <EquipmentCard
-                  key={item.id}
-                  equipment={item}
-                  onPress={() => router.push(`/equipment/${item.id}`)}
-                />
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {showDynamicSections && newArrivalsData.length > 0 && (
-          <View style={styles.contentSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>New Arrivals</Text>
-              <Text style={styles.sectionDescription}>
-                Recently added equipment, fresh on the market!
-              </Text>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalCardScroll}
-            >
-              {newArrivalsData.map((item) => (
-                <EquipmentCard
-                  key={item.id}
-                  equipment={item}
-                  onPress={() => router.push(`/equipment/${item.id}`)}
-                />
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        <View style={styles.contentSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Available Near You</Text>
-            <Text style={styles.sectionDescription}>
-              Explore equipment ready for rent in your vicinity.
+        {listingsToDisplay.length > 0 ? (
+          <FlatList
+            data={listingsToDisplay}
+            renderItem={({ item }) => (
+              <ListingCard
+                listing={item}
+                onPress={() => router.push(`/listings/${item.id}`)}
+              />
+            )}
+            keyExtractor={(item) => item.id!}
+            numColumns={2}
+            columnWrapperStyle={styles.gridRow}
+            contentContainerStyle={styles.gridContainer}
+            scrollEnabled={false}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateTitle}>No Matches Found</Text>
+            <Text style={styles.emptyStateText}>
+              Try adjusting your search or filters.
             </Text>
           </View>
-
-          {filteredEquipment.length > 0 ? (
-            <FlatList
-              data={filteredEquipment}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <EquipmentCard
-                  equipment={item}
-                  onPress={() => router.push(`/equipment/${item.id}`)}
-                />
-              )}
-              numColumns={2}
-              columnWrapperStyle={styles.equipmentRow}
-              contentContainerStyle={styles.equipmentListContent}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
-            />
-          ) : (
-            <View style={styles.emptyStateContainer}>
-              <Text style={styles.emptyStateTitle}>No equipment found</Text>
-              <Text style={styles.emptyStateText}>
-                Try adjusting your search or filter criteria.
-              </Text>
-            </View>
-          )}
-        </View>
+        )}
       </ScrollView>
-
-      <FilterModal
-        visible={isFilterModalVisible}
-        onClose={() => setIsFilterModalVisible(false)}
-      />
     </View>
   );
 }
@@ -263,115 +393,170 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BACKGROUND_LIGHT_GREY,
+    backgroundColor: CARD_BACKGROUND,
   },
-  headerContainer: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: CARD_BACKGROUND,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: TEXT_SECONDARY_GREY,
+    fontFamily: 'Archivo-Medium',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: CARD_BACKGROUND,
+    padding: 24,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#EF4444',
+    textAlign: 'center',
+    fontFamily: 'Archivo-Medium',
+  },
+
+  fixedHeader: {
     backgroundColor: MAIN_COLOR,
-    paddingTop: Platform.OS === 'android' ? 0 : 0,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.2)',
   },
-  headerSafeArea: {
-    backgroundColor: 'transparent',
-  },
-  headerContentWrapper: {
-    backgroundColor: MAIN_COLOR,
-    borderBottomLeftRadius: BORDER_RADIUS * 2,
-    borderBottomRightRadius: BORDER_RADIUS * 2,
+  safeArea: {
+    paddingTop: Platform.OS === 'android' ? 20 : 30,
     paddingHorizontal: 18,
-    paddingTop: Platform.OS === 'android' ? 40 : 20,
-    paddingBottom: 30,
+    paddingBottom: 10,
   },
-  headerTopRow: {
+  headerContent: {
+    paddingTop: 20,
+    paddingBottom: 15,
+    flexDirection: 'column',
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 12,
   },
   greetingText: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 22,
+    fontSize: 20,
     color: HEADER_TEXT_COLOR,
-    marginBottom: 6,
+    marginBottom: 4,
+    textAlign: 'left',
   },
-  locationDropdown: {
+  locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    textAlign: 'left',
   },
   locationText: {
     fontFamily: 'Archivo-Medium',
-    fontSize: 13,
-    color: SLATE_LOCATION_COLOR,
-    marginRight: 6,
+    fontSize: 12,
+    color: LOCATION_COLOR,
+    marginRight: 4,
+    textAlign: 'left',
   },
-  searchAndFilterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  searchInputWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: CARD_BACKGROUND,
+  notificationButton: {
+    padding: 6,
     borderRadius: BORDER_RADIUS,
-    paddingHorizontal: 14,
-    height: 52,
-    borderWidth: 1,
-    borderColor: MAIN_COLOR,
-    marginRight: 12,
-  },
-  searchIcon: {
-    marginRight: 12,
-  },
-  searchInput: {
-    fontFamily: 'Archivo-Regular',
-    flex: 1,
-    height: '100%',
-    fontSize: 16,
-    color: TEXT_PRIMARY_DARK,
-    paddingVertical: 0,
-  },
-  filterButton: {
-    width: 52,
-    height: 52,
-    borderRadius: BORDER_RADIUS,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: CARD_BACKGROUND,
-    borderWidth: 1,
-    borderColor: MAIN_COLOR,
+    borderColor: BORDER_GREY,
+    shadowColor: 'transparent',
   },
 
-  scrollContent: {
-    paddingBottom: 24,
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
+    paddingHorizontal: 12,
+    height: 40,
+    gap: 8,
+    borderColor: BORDER_GREY,
+    shadowColor: 'transparent',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: TEXT_PRIMARY_DARK,
+    fontFamily: 'Archivo-Regular',
+  },
+  filterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: BORDER_RADIUS,
+    backgroundColor: CARD_BACKGROUND,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderColor: BORDER_GREY,
+    shadowColor: 'transparent',
+  },
+
+  scrollViewContent: {
+    flex: 1,
+    marginTop: 75,
+    backgroundColor: CARD_BACKGROUND,
+  },
+  scrollViewContentContainer: {
+    paddingTop: Platform.select({
+      ios: 110,
+      android: 100,
+    }),
+    paddingBottom: Platform.OS === 'ios' ? 70 : 65,
   },
   categoriesSection: {
     backgroundColor: CARD_BACKGROUND,
-    paddingBottom: 14,
-    marginBottom: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_GREY,
-    borderTopWidth: 1,
-    borderTopColor: BORDER_GREY,
-  },
-  categoriesTitleWrapper: {
+    marginBottom: 20,
     paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 10,
+    paddingVertical: 10,
   },
-  categoriesContent: {
-    paddingHorizontal: 18,
-    gap: 8,
+  categoriesTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 15,
+    color: TEXT_PRIMARY_DARK,
+    marginBottom: 4,
+    textAlign: 'left',
+  },
+  categoriesSubtitle: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 14,
+    color: TEXT_SECONDARY_GREY,
+    lineHeight: 20,
+    marginBottom: 12,
+    textAlign: 'left',
+  },
+  categoriesScroll: {
+    paddingHorizontal: 0,
+    gap: 12,
   },
   categoryButton: {
-    backgroundColor: CARD_BACKGROUND,
+    backgroundColor: BACKGROUND_LIGHT_GREY,
     borderRadius: BORDER_RADIUS,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     borderWidth: 1,
     borderColor: BORDER_GREY,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   categoryButtonActive: {
     backgroundColor: MAIN_COLOR,
@@ -379,62 +564,50 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontFamily: 'Archivo-Medium',
-    fontSize: 13,
-    color: TEXT_SECONDARY_GREY,
+    fontSize: 12,
+    color: TEXT_PRIMARY_DARK,
   },
   categoryTextActive: {
     color: HEADER_TEXT_COLOR,
   },
-  contentSection: {
-    backgroundColor: BACKGROUND_LIGHT_GREY,
-    marginBottom: 18,
-  },
-  sectionHeader: {
+
+  gridContainer: {
     paddingHorizontal: 18,
-    marginBottom: 14,
+    paddingBottom: 20,
   },
-  sectionTitle: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 18,
-    color: TEXT_PRIMARY_DARK,
-    marginBottom: 6,
-  },
-  sectionDescription: {
-    fontFamily: 'Archivo-Regular',
-    fontSize: 15,
-    color: TEXT_SECONDARY_GREY,
-  },
-  horizontalCardScroll: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    gap: 14,
-  },
-  equipmentListContent: {
-    paddingHorizontal: 18,
-    paddingBottom: 18,
-  },
-  equipmentRow: {
+  gridRow: {
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 10,
+    gap: 10,
   },
-  emptyStateContainer: {
-    flex: 1,
-    justifyContent: 'center',
+
+  emptyState: {
     alignItems: 'center',
-    padding: 18,
-    minHeight: 180,
+    paddingVertical: 48,
+    paddingHorizontal: 20,
+    backgroundColor: CARD_BACKGROUND,
+    borderRadius: BORDER_RADIUS,
+    marginHorizontal: 18,
+    borderWidth: 1,
+    borderColor: BORDER_GREY,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   emptyStateTitle: {
     fontFamily: 'Archivo-Bold',
     fontSize: 18,
     color: TEXT_PRIMARY_DARK,
-    marginBottom: 12,
+    marginTop: 16,
+    marginBottom: 8,
   },
   emptyStateText: {
     fontFamily: 'Archivo-Regular',
-    fontSize: 15,
+    fontSize: 14,
     color: TEXT_SECONDARY_GREY,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 20,
   },
 });

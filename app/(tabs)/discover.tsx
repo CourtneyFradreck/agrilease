@@ -16,6 +16,8 @@ import { Feather } from '@expo/vector-icons';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import { useRouter } from 'expo-router';
 import { FilterModal } from '@/components/FilterModal';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -310,14 +312,47 @@ export default function Discover() {
   const [mapIsInteracting, setMapIsInteracting] = useState(false);
 
   const [mapRegion, setMapRegion] = useState({
-    latitude: -17.825166,
-    longitude: 31.03351,
+    latitude: -17.825166, // Default fallback
+    longitude: 31.03351,  // Default fallback
     latitudeDelta: LATITUDE_DELTA,
     longitudeDelta: LONGITUDE_DELTA,
   });
+  const [loadingLocation, setLoadingLocation] = useState(true);
 
   const animatedOpacity = useRef(new Animated.Value(1)).current;
   const animatedTranslateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const fetchUserLocation = async () => {
+      try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) return;
+        const db = getFirestore();
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (
+            userData.location &&
+            typeof userData.location.latitude === 'number' &&
+            typeof userData.location.longitude === 'number'
+          ) {
+            setMapRegion((prev) => ({
+              ...prev,
+              latitude: userData.location.latitude,
+              longitude: userData.location.longitude,
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user location:', error);
+      } finally {
+        setLoadingLocation(false);
+      }
+    };
+    fetchUserLocation();
+  }, []);
 
   useEffect(() => {
     if (mapIsInteracting) {
@@ -366,6 +401,14 @@ export default function Discover() {
           item.type.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : mockNearbyEquipment;
+
+  if (loadingLocation) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading map...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -527,7 +570,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'transparent',
+    backgroundColor: 'transparent', // Header background will be transparent over map
     paddingTop: Platform.OS === 'android' ? 40 : 20,
     paddingHorizontal: 18,
     paddingBottom: 10,
@@ -537,14 +580,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: MAIN_COLOR,
+    backgroundColor: 'transparent', // Changed to transparent
     borderRadius: BORDER_RADIUS * 2,
     padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 4,
   },
   searchInputWrapper: {
     flex: 1,
@@ -617,7 +655,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     width: '100%',
-    paddingBottom: Platform.OS === 'ios' ? 100 : 80,
+    paddingBottom: Platform.OS === 'ios' ? 70 : 65,
     backgroundColor: BACKGROUND_LIGHT_GREY,
     borderTopLeftRadius: BORDER_RADIUS * 2,
     borderTopRightRadius: BORDER_RADIUS * 2,
@@ -656,11 +694,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: BORDER_GREY,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 2,
   },
   equipmentImage: {
     width: '100%',
@@ -670,29 +703,30 @@ const styles = StyleSheet.create({
   },
   equipmentDetails: {
     padding: 12,
+    backgroundColor: MAIN_COLOR,
   },
   equipmentName: {
     fontFamily: 'Archivo-Bold',
     fontSize: 15,
-    color: TEXT_PRIMARY_DARK,
+    color: HEADER_TEXT_COLOR,
     marginBottom: 2,
   },
   equipmentType: {
     fontFamily: 'Archivo-Regular',
     fontSize: 12,
-    color: TEXT_SECONDARY_GREY,
+    color: HEADER_TEXT_COLOR,
     marginBottom: 8,
   },
   equipmentPrice: {
     fontFamily: 'Archivo-Bold',
     fontSize: 18,
-    color: MAIN_COLOR,
+    color: HEADER_TEXT_COLOR,
     marginBottom: 8,
   },
   equipmentPriceUnit: {
     fontFamily: 'Archivo-Regular',
     fontSize: 12,
-    color: TEXT_SECONDARY_GREY,
+    color: HEADER_TEXT_COLOR,
   },
   cardActions: {
     flexDirection: 'row',
@@ -701,7 +735,7 @@ const styles = StyleSheet.create({
   },
   bookNowButton: {
     flex: 1,
-    backgroundColor: MAIN_COLOR,
+    backgroundColor: CARD_BACKGROUND,
     borderRadius: BORDER_RADIUS - 2,
     paddingVertical: 10,
     marginRight: 5,
@@ -711,23 +745,23 @@ const styles = StyleSheet.create({
   bookNowButtonText: {
     fontFamily: 'Archivo-Medium',
     fontSize: 13,
-    color: HEADER_TEXT_COLOR,
+    color: MAIN_COLOR,
   },
   detailsButton: {
     flex: 1,
-    backgroundColor: CARD_BACKGROUND,
+    backgroundColor: MAIN_COLOR,
     borderRadius: BORDER_RADIUS - 2,
     paddingVertical: 10,
     marginLeft: 5,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: MAIN_COLOR,
+    borderColor: HEADER_TEXT_COLOR,
   },
   detailsButtonText: {
     fontFamily: 'Archivo-Medium',
     fontSize: 13,
-    color: MAIN_COLOR,
+    color: HEADER_TEXT_COLOR,
   },
   emptyStateContainer: {
     justifyContent: 'center',
