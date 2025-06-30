@@ -1,34 +1,49 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User } from '@/types/user';
-
-// Import Firebase services
-import { auth, db } from '../FirebaseConfig'; 
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  onAuthStateChanged, 
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { UserSchema } from '@/utils/validators';
+import {
+  createUserWithEmailAndPassword,
+  updateProfile as firebaseUpdateProfile,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
   signOut,
-  updateProfile as firebaseUpdateProfile
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { z } from 'zod';
+import { auth, db } from '../FirebaseConfig';
+import { Timestamp } from 'firebase/firestore';
+
+type UserDataFromFirestore = z.infer<typeof UserSchema>;
+
+export type User = UserDataFromFirestore & { id: string };
+
+type RegisterInput = Omit<
+  UserDataFromFirestore,
+  'id' | 'registrationDate' | 'averageRating' | 'numberOfRatings'
+>;
 
 interface AuthContextType {
   isAuthenticated: boolean;
   currentUser: User | null;
-  loadingAuth: boolean; 
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (fullname: string, email: string, phone: string, password: string, userType: 'farmer' | 'owner') => Promise<boolean>;
+  loadingAuth: boolean;
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  register: (
+    userData: RegisterInput,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
-  updateProfile: (user: Partial<User>) => Promise<boolean>;
+  updateProfile: (updates: Partial<User>) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   currentUser: null,
-  loadingAuth: true, 
-  login: async () => false,
-  register: async () => false,
+  loadingAuth: true,
+  login: async () => ({ success: false, error: 'Auth not initialized' }),
+  register: async () => ({ success: false, error: 'Auth not initialized' }),
   logout: () => {},
   updateProfile: async () => false,
 });
@@ -39,200 +54,300 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
+const getFirebaseErrorMessage = (error: any): string => {
+  if (error.message === 'Operation timed out') {
+    return 'The operation took too long. Please check your internet connection and try again.';
+  }
+  switch (error.code) {
+    case 'auth/invalid-email':
+      return 'The email address is not valid.';
+    case 'auth/user-disabled':
+      return 'This user account has been disabled.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Invalid email or password. Please try again.';
+    case 'auth/email-already-in-use':
+      return 'This email is already in use. Please use a different email or log in.';
+    case 'auth/weak-password':
+      return 'Password is too weak. Please choose a stronger password.';
+    case 'auth/too-many-requests':
+      return 'Too many login attempts. Please try again later.';
+    case 'auth/network-request-failed':
+      return 'Network error. Please check your internet connection.';
+    default:
+      return 'An unexpected error occurred. Please try again.';
+  }
+};
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [isRegistering, setIsRegistering] = useState(false); // Track registration state
+  const [isRegistering, setIsRegistering] = useState(false);
 
-  // Listen for Firebase Auth state changes with improved handling
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // If we're in the middle of registration, skip this auth state change
-      // to prevent race conditions
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // FIX: If a registration is in progress, simply acknowledge the auth state change
+      // but do NOT sign out. Let the 'register' function complete its flow.
       if (isRegistering) {
+        console.log(
+          'Auth State Changed: Registration is in progress, deferring full state update.',
+        );
+        setLoadingAuth(false);
         return;
       }
 
-      if (user) {
-        // User is signed in. Fetch their additional data from Firestore.
+      if (firebaseUser) {
         try {
-          const userDocRef = doc(db, 'users', user.uid);
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
           const userDocSnap = await getDoc(userDocRef);
 
           if (userDocSnap.exists()) {
-            const userDataFromFirestore = userDocSnap.data() as Omit<User, 'id'>;
+            console.log('User document found.');
+            const userDataFromFirestore = UserSchema.parse(userDocSnap.data());
             const fullUser: User = {
-              id: user.uid,
-              email: user.email || userDataFromFirestore.email,
-              fullname: user.displayName || userDataFromFirestore.fullname,
+              id: firebaseUser.uid,
               ...userDataFromFirestore,
             };
-            
+
             setCurrentUser(fullUser);
             setIsAuthenticated(true);
             await AsyncStorage.setItem('@user', JSON.stringify(fullUser));
+            console.log(
+              'Auth State Changed: User successfully loaded and set.',
+            );
           } else {
-            // Document doesn't exist - could be during registration or incomplete setup
-            console.warn('User document not found in Firestore for UID:', user.uid);
-            
-            // Wait a bit and retry once (for race condition during registration)
-            setTimeout(async () => {
-              try {
-                const retryDocSnap = await getDoc(userDocRef);
-                if (retryDocSnap.exists()) {
-                  const userDataFromFirestore = retryDocSnap.data() as Omit<User, 'id'>;
-                  const fullUser: User = {
-                    id: user.uid,
-                    email: user.email || userDataFromFirestore.email,
-                    fullname: user.displayName || userDataFromFirestore.fullname,
-                    ...userDataFromFirestore,
-                  };
-                  
-                  setCurrentUser(fullUser);
-                  setIsAuthenticated(true);
-                  await AsyncStorage.setItem('@user', JSON.stringify(fullUser));
-                } else {
-                  // Still no document - sign out user
-                  console.error('User document still not found after retry');
-                  await signOut(auth);
-                }
-              } catch (error) {
-                console.error('Error during retry fetch:', error);
-                await signOut(auth);
-              }
-            }, 1000); // Wait 1 second before retry
+            console.warn(
+              'Auth State Changed: Firebase user found, but no Firestore document. Signing out.',
+            );
+            await signOut(auth);
           }
-        } catch (error) {
-          console.error('Error fetching user data from Firestore:', error);
+        } catch (error: any) {
+          console.error(
+            'Auth State Changed Error: Failed to load user from Firestore or operation timed out:',
+            error.message,
+          );
           setCurrentUser(null);
           setIsAuthenticated(false);
           await AsyncStorage.removeItem('@user');
+          await signOut(auth);
         }
       } else {
-        // User is signed out.
+        console.log(
+          'Auth State Changed: No Firebase user found. User is logged out.',
+        );
         setCurrentUser(null);
         setIsAuthenticated(false);
         await AsyncStorage.removeItem('@user');
       }
-      
+
       setLoadingAuth(false);
     });
 
     return () => unsubscribe();
   }, [isRegistering]);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (
+    email: string,
+    password: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    setLoadingAuth(true);
     try {
-      setLoadingAuth(true);
-      await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged listener will handle setting currentUser and isAuthenticated
-      return true; 
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password,
+      );
+      console.log('Login Success:', userCredential.user.email);
+      return { success: true };
     } catch (error: any) {
-      console.error('Firebase Login Error:', error.code, error.message);
+      const errorMessage = getFirebaseErrorMessage(error);
+      console.error('Login Error:', error.message);
+      return { success: false, error: errorMessage };
+    } finally {
       setLoadingAuth(false);
-      return false;
     }
   };
 
   const register = async (
-    fullname: string, 
-    email: string, 
-    phone: string, 
-    password: string, 
-    userType: 'farmer' | 'owner'
-  ): Promise<boolean> => {
-    try {
-      setLoadingAuth(true);
-      setIsRegistering(true); // Prevent auth state listener from interfering
-      
-      // 1. Create user in Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+    userData: RegisterInput,
+    password: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    let userCredential: any;
+    let firestoreDocCreated = false;
+    setLoadingAuth(true);
+    setIsRegistering(true);
 
-      // 2. Prepare user data for Firestore
-      const newUserDocData: User = {
-        id: user.uid,
-        fullname: fullname, 
-        email: email,       
-        phone: phone,
-        userType: userType,
-        location: 'Not set',
-        createdAt: new Date().toISOString(),
-        rentals: [], 
-        listings: [],
+    try {
+      const newUserDocData: UserDataFromFirestore = {
+        ...userData,
+        registrationDate: Timestamp.now(),
+        averageRating: 0,
+        numberOfRatings: 0,
       };
 
-      // 3. Create Firestore document BEFORE updating profile
-      await setDoc(doc(db, 'users', user.uid), newUserDocData);
-      
-      // 4. Update Firebase Auth profile
-      await firebaseUpdateProfile(user, { displayName: fullname });
+      let validatedData: UserDataFromFirestore;
+      try {
+        validatedData = UserSchema.parse(newUserDocData);
+        console.log('Register: User data validated successfully.');
+      } catch (zodError) {
+        if (zodError instanceof z.ZodError) {
+          zodError.issues.forEach((issue) =>
+            console.error(
+              'Register Zod Validation Error:',
+              issue.path.join('.') + ': ' + issue.message,
+            ),
+          );
+        } else {
+          console.error('Register Validation Error:', zodError);
+        }
+        return {
+          success: false,
+          error: 'Provided data is invalid. Please check your inputs.',
+        };
+      }
 
-      // 5. Manually set the user state to prevent race conditions
-      setCurrentUser(newUserDocData);
+      userCredential = await createUserWithEmailAndPassword(
+        auth,
+        userData.email,
+        password,
+      );
+      const firebaseUser = userCredential.user;
+      console.log('Register: Firebase user created:', firebaseUser.uid);
+
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      await setDoc(userDocRef, validatedData);
+      firestoreDocCreated = true;
+      console.log(
+        'Register: Firestore document created for user:',
+        firebaseUser.uid,
+      );
+
+      await firebaseUpdateProfile(firebaseUser, { displayName: userData.name });
+      console.log('Register: Firebase profile updated with display name.');
+
+      const fullUser: User = { id: firebaseUser.uid, ...validatedData };
+      setCurrentUser(fullUser);
       setIsAuthenticated(true);
-      await AsyncStorage.setItem('@user', JSON.stringify(newUserDocData));
-      
-      console.log("User registered successfully and Firestore document created.");
-      
-      return true;
+      await AsyncStorage.setItem('@user', JSON.stringify(fullUser));
+      console.log('Register Success: User account created and data saved.');
+
+      return { success: true };
     } catch (error: any) {
-      console.error('Firebase Register Error:', error.code, error.message);
-      
-      // If there's an error, make sure to clean up any partial registration
-      if (auth.currentUser) {
+      const errorMessage = getFirebaseErrorMessage(error);
+      console.error('Register Error:', error.message);
+
+      const currentFirebaseUser = auth.currentUser;
+      const createdUserId = userCredential?.user?.uid;
+
+      if (
+        createdUserId &&
+        currentFirebaseUser &&
+        currentFirebaseUser.uid === createdUserId &&
+        error.code !== 'auth/email-already-in-use'
+      ) {
         try {
-          await auth.currentUser.delete();
-        } catch (deleteError) {
-          console.error('Error cleaning up failed registration:', deleteError);
+          console.warn(
+            'Register Error: Attempting to rollback - deleting Firebase Auth user.',
+          );
+          await currentFirebaseUser.delete();
+          console.log(
+            'Register Error: Firebase Auth user deleted successfully.',
+          );
+        } catch (deleteAuthError: any) {
+          console.error(
+            'Register Error: Failed to delete Firebase Auth user during rollback:',
+            deleteAuthError.message,
+          );
         }
       }
-      
-      return false;
+
+      if (createdUserId && firestoreDocCreated) {
+        try {
+          console.warn(
+            'Register Error: Attempting to rollback - deleting Firestore document.',
+          );
+          await deleteDoc(doc(db, 'users', createdUserId));
+          console.log(
+            'Register Error: Firestore document deleted successfully.',
+          );
+        } catch (deleteFirestoreError: any) {
+          console.error(
+            'Register Error: Failed to delete Firestore document during rollback:',
+            deleteFirestoreError.message,
+          );
+        }
+      }
+
+      return { success: false, error: errorMessage };
     } finally {
-      setIsRegistering(false); // Allow auth state listener to work again
+      setIsRegistering(false); // Ensure registration flag is reset
       setLoadingAuth(false);
     }
   };
 
   const logout = async () => {
+    setLoadingAuth(true);
     try {
-      setLoadingAuth(true);
       await signOut(auth);
-      // onAuthStateChanged listener will handle clearing currentUser and isAuthenticated
-    } catch (error) {
-      console.error('Firebase Logout Error:', error);
+      console.log('Logout Success: User logged out.');
+    } catch (error: any) {
+      console.error('Logout Error:', error.message);
+    } finally {
       setLoadingAuth(false);
     }
   };
 
-  const updateProfile = async (userData: Partial<User>): Promise<boolean> => {
+  const updateProfile = async (updates: Partial<User>): Promise<boolean> => {
     if (!currentUser || !auth.currentUser) {
-      console.error("No current user to update.");
+      console.warn('Update Profile: No current user or Firebase user found.');
       return false;
     }
 
+    setLoadingAuth(true);
     try {
-      setLoadingAuth(true);
       const userDocRef = doc(db, 'users', currentUser.id);
-      
-      // Update Firestore document with new data
-      await updateDoc(userDocRef, userData);
 
-      // If name needs to be updated directly in Auth displayName
-      if (userData.fullname && auth.currentUser.displayName !== userData.fullname) {
-        await firebaseUpdateProfile(auth.currentUser, { displayName: userData.fullname });
+      const updatesForFirestore: Partial<UserDataFromFirestore> = {};
+      for (const key in updates) {
+        if (Object.prototype.hasOwnProperty.call(updates, key)) {
+          const value = updates[key as keyof Partial<User>];
+          if (key === 'registrationDate' && value instanceof Date) {
+            updatesForFirestore[key as keyof Partial<UserDataFromFirestore>] =
+              Timestamp.fromDate(value) as any;
+          } else {
+            updatesForFirestore[key as keyof Partial<UserDataFromFirestore>] =
+              value as any;
+          }
+        }
       }
-      
-      // Manually update the local currentUser state to reflect changes immediately
-      const updatedUser = { ...currentUser, ...userData };
+
+      const validatedUpdates = UserSchema.partial().parse(updatesForFirestore);
+      console.log('Update Profile: Updates validated:', validatedUpdates);
+
+      await updateDoc(userDocRef, validatedUpdates);
+      console.log('Update Profile: Firestore document updated.');
+
+      if (
+        validatedUpdates.name &&
+        auth.currentUser.displayName !== validatedUpdates.name
+      ) {
+        await firebaseUpdateProfile(auth.currentUser, {
+          displayName: validatedUpdates.name,
+        });
+        console.log('Update Profile: Firebase display name updated.');
+      }
+
+      const updatedUser = { ...currentUser, ...validatedUpdates };
       setCurrentUser(updatedUser);
       await AsyncStorage.setItem('@user', JSON.stringify(updatedUser));
-      console.log("User profile updated successfully.");
+      console.log(
+        'Update Profile Success: User data updated in state and AsyncStorage.',
+      );
       return true;
-    } catch (error) {
-      console.error('Error updating user profile:', error);
+    } catch (error: any) {
+      console.error('Update Profile Error:', error.message);
       return false;
     } finally {
       setLoadingAuth(false);
@@ -240,15 +355,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      isAuthenticated, 
-      currentUser, 
-      loadingAuth, 
-      login, 
-      register, 
-      logout,
-      updateProfile
-    }}>
+    <AuthContext.Provider
+      value={{
+        isAuthenticated,
+        currentUser,
+        loadingAuth,
+        login,
+        register,
+        logout,
+        updateProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,12 @@ import {
   TouchableOpacity,
   Modal,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useData } from '@/context/DataContext';
 import { Button } from '@/components/Button';
 import dayjs from 'dayjs';
-
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 
@@ -23,6 +22,25 @@ dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
 
 import { Calendar, LocaleConfig } from 'react-native-calendars';
+import { db } from '@/FirebaseConfig';
+import {
+  doc,
+  getDoc,
+  addDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+} from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { Timestamp } from 'firebase/firestore';
+
+import {
+  EquipmentSchema,
+  ListingSchema,
+  BookingSchema,
+} from '@/utils/validators';
+import { z } from 'zod';
 
 interface DayPressEvent {
   dateString: string;
@@ -31,6 +49,9 @@ interface DayPressEvent {
   year: number;
   timestamp: number;
 }
+
+type Equipment = z.infer<typeof EquipmentSchema>;
+type Listing = z.infer<typeof ListingSchema>;
 
 LocaleConfig.locales['en'] = {
   monthNames: [
@@ -88,44 +109,108 @@ const CALENDAR_RANGE_BG = '#D4EDD4';
 const ERROR_RED = '#DC2626';
 
 export default function BookingPage() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: listingId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getRentalEquipmentById, createBooking } = useData();
+  const auth = getAuth();
+  const currentUserId = auth.currentUser?.uid;
 
-  const equipment = getRentalEquipmentById(id);
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [equipment, setEquipment] = useState<Equipment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [startDate, setStartDate] = useState<Timestamp | null>(null);
+  const [endDate, setEndDate] = useState<Timestamp | null>(null);
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
 
-  if (!equipment) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Equipment not found</Text>
-        <Button
-          onPress={() => router.back()}
-          text="Go Back"
-          style={styles.goBackButton}
-        />
-      </View>
-    );
-  }
+  useEffect(() => {
+    const fetchListingAndEquipment = async () => {
+      if (!listingId) {
+        setError('Listing ID is missing.');
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      try {
+        const listingDocRef = doc(db, 'listings', listingId);
+        const listingSnap = await getDoc(listingDocRef);
+
+        if (!listingSnap.exists()) {
+          setError('Listing not found.');
+          setLoading(false);
+          return;
+        }
+
+        const listingData = listingSnap.data();
+        const parsedListing = ListingSchema.parse({
+          ...listingData,
+          id: listingSnap.id,
+          availabilityStartDate: listingData.availabilityStartDate,
+          availabilityEndDate: listingData.availabilityEndDate,
+          createdAt: listingData.createdAt,
+        });
+        setListing(parsedListing);
+
+        const equipmentDocRef = doc(db, 'equipment', parsedListing.equipmentId);
+        const equipmentSnap = await getDoc(equipmentDocRef);
+
+        if (!equipmentSnap.exists()) {
+          setError('Associated equipment not found.');
+          setLoading(false);
+          return;
+        }
+        const equipmentData = equipmentSnap.data();
+        const parsedEquipment = EquipmentSchema.parse({
+          ...equipmentData,
+          id: equipmentSnap.id,
+          lastUpdatedAt: equipmentData.lastUpdatedAt,
+        });
+        setEquipment(parsedEquipment);
+      } catch (e) {
+        if (e instanceof z.ZodError) {
+          setError(
+            `Data validation error: ${e.errors.map((err) => err.message).join(', ')}`,
+          );
+        } else {
+          setError('Failed to load listing details. Please try again.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchListingAndEquipment();
+  }, [listingId]);
 
   const handleDayPress = useCallback(
     (day: DayPressEvent) => {
-      const selectedMoment = dayjs(day.dateString);
+      const selectedTimestamp = Timestamp.fromDate(
+        dayjs(day.dateString).toDate(),
+      );
 
-      if (!startDate || selectedMoment.isBefore(dayjs(startDate), 'day')) {
-        setStartDate(selectedMoment.toDate());
+      if (
+        !startDate ||
+        dayjs(selectedTimestamp.toDate()).isBefore(
+          dayjs(startDate.toDate()),
+          'day',
+        )
+      ) {
+        setStartDate(selectedTimestamp);
         setEndDate(null);
       } else if (
         startDate &&
         !endDate &&
-        selectedMoment.isSameOrAfter(dayjs(startDate), 'day')
+        dayjs(selectedTimestamp.toDate()).isSameOrAfter(
+          dayjs(startDate.toDate()),
+          'day',
+        )
       ) {
-        setEndDate(selectedMoment.toDate());
+        setEndDate(selectedTimestamp);
       } else if (startDate && endDate) {
-        setStartDate(selectedMoment.toDate());
+        setStartDate(selectedTimestamp);
         setEndDate(null);
       }
     },
@@ -134,21 +219,33 @@ export default function BookingPage() {
 
   const rentalDays = useMemo(() => {
     if (startDate && endDate) {
-      const diffDays = dayjs(endDate).diff(dayjs(startDate), 'day') + 1;
+      const diffDays =
+        dayjs(endDate.toDate()).diff(dayjs(startDate.toDate()), 'day') + 1;
       return Math.max(1, diffDays);
     }
     return 0;
   }, [startDate, endDate]);
 
-  const totalPrice = rentalDays * (equipment.rentalPrice || 0);
+  const totalPrice = rentalDays * (listing?.price || 0);
 
   const handleSubmitRequest = async () => {
+    if (!currentUserId) {
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to make a booking.',
+      );
+      router.replace('/login');
+      return;
+    }
+    if (!listing || !equipment) {
+      Alert.alert('Error', 'Listing or equipment data is missing.');
+      return;
+    }
     if (!startDate || !endDate) {
       Alert.alert('Missing Dates', 'Please select both start and end dates.');
       return;
     }
-
-    if (dayjs(endDate).isBefore(dayjs(startDate), 'day')) {
+    if (dayjs(endDate.toDate()).isBefore(dayjs(startDate.toDate()), 'day')) {
       Alert.alert(
         'Invalid Dates',
         'End date cannot be earlier than start date.',
@@ -156,13 +253,53 @@ export default function BookingPage() {
       return;
     }
 
+    setIsSubmittingBooking(true);
     try {
-      await createBooking({
-        equipmentId: equipment.id,
-        startDate,
-        endDate,
-        totalPrice,
+      const bookingData: Omit<z.infer<typeof BookingSchema>, 'id'> = {
+        equipmentId: equipment.id as string,
+        listingId: listing.id as string,
+        renterId: currentUserId,
+        ownerId: listing.ownerId,
+        startDate: startDate,
+        endDate: endDate,
+        totalPrice: parseFloat(totalPrice.toFixed(2)),
+        bookingDate: Timestamp.now(),
+        status: 'pending',
+      };
+
+      BookingSchema.parse(bookingData);
+
+      const bookingsRef = collection(db, 'bookings');
+      const q = query(
+        bookingsRef,
+        where('equipmentId', '==', equipment.id),
+        where('status', 'in', ['pending', 'confirmed']),
+      );
+
+      const existingBookings = await getDocs(q);
+      const hasConflict = existingBookings.docs.some((doc) => {
+        const booking = doc.data();
+        const bookingStart = booking.startDate.toDate();
+        const bookingEnd = booking.endDate.toDate();
+        const selectedStart = startDate.toDate();
+        const selectedEnd = endDate.toDate();
+
+        return (
+          (selectedStart >= bookingStart && selectedStart <= bookingEnd) ||
+          (selectedEnd >= bookingStart && selectedEnd <= bookingEnd) ||
+          (selectedStart <= bookingStart && selectedEnd >= bookingEnd)
+        );
       });
+
+      if (hasConflict) {
+        Alert.alert(
+          'Booking Conflict',
+          'This equipment is already booked for some or all of the selected dates. Please choose different dates.',
+        );
+        return;
+      }
+
+      await addDoc(collection(db, 'bookings'), bookingData);
 
       Alert.alert(
         'Booking Request Sent',
@@ -174,17 +311,26 @@ export default function BookingPage() {
           },
         ],
       );
-    } catch (error) {
-      console.error('Failed to create booking:', error);
-      Alert.alert(
-        'Booking Failed',
-        'There was an issue sending your booking request. Please try again.',
-        [{ text: 'OK' }],
-      );
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        Alert.alert(
+          'Validation Error',
+          `Booking data invalid: ${error.errors.map((err) => err.message).join(', ')}`,
+        );
+      } else {
+        Alert.alert(
+          'Booking Failed',
+          'There was an issue sending your booking request. Please try again.',
+          [{ text: 'OK' }],
+        );
+      }
+    } finally {
+      setIsSubmittingBooking(false);
     }
   };
 
-  const isSubmitDisabled = !startDate || !endDate || rentalDays <= 0;
+  const isSubmitDisabled =
+    !startDate || !endDate || rentalDays <= 0 || isSubmittingBooking;
 
   const markedDates = useMemo(() => {
     const dates: { [key: string]: any } = {};
@@ -205,23 +351,23 @@ export default function BookingPage() {
     };
 
     if (startDate && endDate) {
-      let currentDate = dayjs(startDate);
-      while (currentDate.isSameOrBefore(dayjs(endDate), 'day')) {
+      let currentDate = dayjs(startDate.toDate());
+      while (currentDate.isSameOrBefore(dayjs(endDate.toDate()), 'day')) {
         const dateString = currentDate.format('YYYY-MM-DD');
         dates[dateString] = {
           color: CALENDAR_RANGE_BG,
           textColor: TEXT_PRIMARY_DARK,
-          startingDay: currentDate.isSame(dayjs(startDate), 'day'),
-          endingDay: currentDate.isSame(dayjs(endDate), 'day'),
+          startingDay: currentDate.isSame(dayjs(startDate.toDate()), 'day'),
+          endingDay: currentDate.isSame(dayjs(endDate.toDate()), 'day'),
           customStyles: {
             container: {
               backgroundColor: CALENDAR_RANGE_BG,
               borderRadius: 0,
-              ...(currentDate.isSame(dayjs(startDate), 'day') && {
+              ...(currentDate.isSame(dayjs(startDate.toDate()), 'day') && {
                 borderTopLeftRadius: BORDER_RADIUS / 2,
                 borderBottomLeftRadius: BORDER_RADIUS / 2,
               }),
-              ...(currentDate.isSame(dayjs(endDate), 'day') && {
+              ...(currentDate.isSame(dayjs(endDate.toDate()), 'day') && {
                 borderTopRightRadius: BORDER_RADIUS / 2,
                 borderBottomRightRadius: BORDER_RADIUS / 2,
               }),
@@ -234,7 +380,7 @@ export default function BookingPage() {
         currentDate = currentDate.add(1, 'day');
       }
     } else if (startDate) {
-      const dateString = dayjs(startDate).format('YYYY-MM-DD');
+      const dateString = dayjs(startDate.toDate()).format('YYYY-MM-DD');
       dates[dateString] = {
         selected: true,
         startingDay: true,
@@ -255,7 +401,32 @@ export default function BookingPage() {
     return dates;
   }, [startDate, endDate]);
 
-  const { name, rentalPrice } = equipment;
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={MAIN_COLOR} />
+        <Text style={styles.loadingText}>Loading booking details...</Text>
+      </View>
+    );
+  }
+
+  if (error || !listing || !equipment) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>
+          {error || 'Booking details could not be loaded.'}
+        </Text>
+        <Button
+          onPress={() => router.back()}
+          text="Go Back"
+          style={styles.goBackButton}
+        />
+      </View>
+    );
+  }
+
+  const { name } = equipment;
+  const { price, rentalUnit } = listing;
 
   return (
     <View style={styles.fullScreenContainer}>
@@ -271,7 +442,12 @@ export default function BookingPage() {
             color={HEADER_TEXT_COLOR}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Confirm Booking</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Confirm Booking</Text>
+          <Text style={styles.headerDescription}>
+            Finalize your rental request
+          </Text>
+        </View>
         <View style={{ width: 24 }} />
       </SafeAreaView>
 
@@ -280,31 +456,30 @@ export default function BookingPage() {
           <Text style={styles.summaryTitle}>Requesting to Rent</Text>
           <Text style={styles.equipmentName}>{name}</Text>
           <Text style={styles.equipmentPrice}>
-            ${rentalPrice?.toFixed(2)} per day
+            ${price?.toFixed(2)} per {rentalUnit}
           </Text>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionTitleContainer}>
             <MaterialIcons name="calendar-today" size={22} color={MAIN_COLOR} />
             <Text style={styles.sectionTitle}>Select Rental Dates</Text>
           </View>
-
           <TouchableOpacity
             style={styles.selectDatesButton}
             onPress={() => setIsCalendarVisible(true)}
             accessibilityLabel={
               startDate && endDate
-                ? `Selected dates from ${dayjs(startDate).format(
+                ? `Selected dates from ${dayjs(startDate.toDate()).format(
                     'MMM D',
-                  )} to ${dayjs(endDate).format('MMM D')}`
+                  )} to ${dayjs(endDate.toDate()).format('MMM D')}`
                 : 'Select rental dates'
             }
           >
             <Text style={styles.selectDatesButtonText}>
               {startDate && endDate
-                ? `${dayjs(startDate).format('MMM D, YYYY')} - ${dayjs(
-                    endDate,
+                ? `${dayjs(startDate.toDate()).format('MMM D, YYYY')} - ${dayjs(
+                    endDate.toDate(),
                   ).format('MMM D, YYYY')}`
                 : 'Tap to select dates'}
             </Text>
@@ -316,14 +491,14 @@ export default function BookingPage() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Rental Summary</Text>
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionTitle}>Rental Summary</Text>
+          </View>
           <View style={styles.summaryGrid}>
             <View style={styles.summaryGridItem}>
               <Text style={styles.summaryItemLabel}>Daily Rate</Text>
-              <Text style={styles.summaryItemValue}>
-                ${rentalPrice?.toFixed(2)}
-              </Text>
+              <Text style={styles.summaryItemValue}>${price?.toFixed(2)}</Text>
             </View>
             <View style={styles.summaryGridItem}>
               <Text style={styles.summaryItemLabel}>Rental Period</Text>
@@ -340,8 +515,10 @@ export default function BookingPage() {
           </View>
         </View>
 
-        <View style={styles.policySection}>
-          <Text style={styles.sectionTitle}>Booking Policies</Text>
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionTitle}>Booking Policies</Text>
+          </View>
           <View style={styles.policyList}>
             <Text style={styles.policyBullet}>
               • Free cancellation up to 48 hours before pickup.
@@ -364,11 +541,10 @@ export default function BookingPage() {
         </View>
         <Button
           onPress={handleSubmitRequest}
-          text="Submit Request"
+          text={isSubmittingBooking ? 'Submitting...' : 'Submit Request'}
           style={styles.submitBookingButton}
           textStyle={styles.submitBookingButtonText}
           disabled={isSubmitDisabled}
-          accessibilityLabel="Submit booking request"
         />
       </View>
 
@@ -436,26 +612,60 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BACKGROUND_LIGHT_GREY,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: BACKGROUND_LIGHT_GREY,
+  },
+  loadingText: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 16,
+    color: TEXT_SECONDARY_GREY,
+    marginTop: 10,
+  },
   scrollContent: {
     paddingBottom: 100,
+    paddingTop: Platform.OS === 'android' ? 70 : 80,
+    marginTop: 30,
+    flexGrow: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-
     justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingTop: Platform.OS === 'android' ? 35 : 45,
+    paddingHorizontal: 16,
+    paddingTop: 30,
     paddingBottom: 10,
     backgroundColor: MAIN_COLOR,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.2)',
   },
   backButton: {
-    padding: 5,
+    padding: 6,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+    marginLeft: 10,
   },
   headerTitle: {
     fontFamily: 'Archivo-Bold',
     fontSize: 18,
     color: HEADER_TEXT_COLOR,
+    textAlign: 'left',
+  },
+  headerDescription: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'left',
+    marginTop: 2,
   },
   errorContainer: {
     flex: 1,
@@ -469,19 +679,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: ERROR_RED,
     marginBottom: 16,
+    textAlign: 'center',
   },
   goBackButton: {
     width: 150,
   },
-
   equipmentSummary: {
     backgroundColor: CARD_BACKGROUND,
-    padding: 16,
-    marginBottom: 16,
-    marginTop: 16,
+    padding: 18,
+    marginBottom: 20,
+    marginTop: 0,
     borderRadius: BORDER_RADIUS,
-    marginHorizontal: 15,
-    zIndex: 1,
+    marginHorizontal: 18,
     borderWidth: 1,
     borderColor: BORDER_GREY,
   },
@@ -490,36 +699,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: TEXT_SECONDARY_GREY,
     marginBottom: 4,
+    textAlign: 'left',
   },
   equipmentName: {
     fontFamily: 'Archivo-Bold',
     fontSize: 20,
     color: TEXT_PRIMARY_DARK,
     marginBottom: 4,
+    textAlign: 'left',
   },
   equipmentPrice: {
     fontFamily: 'Archivo-Medium',
     fontSize: 16,
     color: MAIN_COLOR,
+    textAlign: 'left',
   },
-  section: {
+  sectionContainer: {
     backgroundColor: CARD_BACKGROUND,
-    padding: 16,
-    marginBottom: 16,
+    padding: 18,
+    marginBottom: 20,
+    marginHorizontal: 18,
     borderRadius: BORDER_RADIUS,
-    marginHorizontal: 15,
     borderWidth: 1,
     borderColor: BORDER_GREY,
   },
-  sectionHeader: {
+  sectionTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 0,
     marginBottom: 10,
   },
   sectionTitle: {
     fontFamily: 'Archivo-Bold',
-    fontSize: 16,
+    fontSize: 18,
     color: TEXT_PRIMARY_DARK,
+    textAlign: 'left',
+    marginBottom: 4,
     marginLeft: 8,
   },
   selectDatesButton: {
@@ -537,6 +752,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Medium',
     fontSize: 15,
     color: TEXT_PRIMARY_DARK,
+    textAlign: 'left',
   },
   summaryGrid: {
     flexDirection: 'row',
@@ -553,17 +769,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER_GREY,
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   summaryItemLabel: {
     fontFamily: 'Archivo-Regular',
     fontSize: 13,
     color: TEXT_SECONDARY_GREY,
     marginBottom: 4,
+    textAlign: 'left',
   },
   summaryItemValue: {
     fontFamily: 'Archivo-Medium',
     fontSize: 15,
     color: TEXT_PRIMARY_DARK,
+    textAlign: 'left',
   },
   summaryTotalItem: {
     width: '100%',
@@ -571,25 +790,19 @@ const styles = StyleSheet.create({
     borderColor: MAIN_COLOR,
     borderWidth: 2,
     marginTop: 5,
+    alignItems: 'flex-start',
   },
   summaryTotalLabel: {
     fontFamily: 'Archivo-Bold',
     fontSize: 16,
     color: TEXT_PRIMARY_DARK,
+    textAlign: 'left',
   },
   summaryTotalValue: {
     fontFamily: 'Archivo-Bold',
     fontSize: 20,
     color: MAIN_COLOR,
-  },
-  policySection: {
-    backgroundColor: CARD_BACKGROUND,
-    padding: 16,
-    marginBottom: 16,
-    borderRadius: BORDER_RADIUS,
-    marginHorizontal: 15,
-    borderWidth: 1,
-    borderColor: BORDER_GREY,
+    textAlign: 'left',
   },
   policyList: {
     marginTop: 10,
@@ -600,6 +813,7 @@ const styles = StyleSheet.create({
     color: TEXT_PRIMARY_DARK,
     marginBottom: 8,
     lineHeight: 20,
+    textAlign: 'left',
   },
   bottomBar: {
     position: 'absolute',
@@ -612,8 +826,8 @@ const styles = StyleSheet.create({
     backgroundColor: MAIN_COLOR,
     paddingHorizontal: 20,
     paddingVertical: 15,
-    borderTopLeftRadius: BORDER_RADIUS * 2,
-    borderTopRightRadius: BORDER_RADIUS * 2,
+    borderTopLeftRadius: BORDER_RADIUS,
+    borderTopRightRadius: BORDER_RADIUS,
   },
   priceFooter: {
     flexDirection: 'row',
