@@ -161,24 +161,7 @@ export default function EquipmentDetails() {
       return;
     }
 
-    const alertButtons: {
-      text: string;
-      onPress?: () => void;
-      style?: 'cancel' | 'default' | 'destructive';
-    }[] = [{ text: 'Cancel', style: 'cancel' }];
-
-    if (detailedListing.owner.email) {
-      alertButtons.push({
-        text: 'Send Email',
-        onPress: () => Linking.openURL(`mailto:${detailedListing.owner.email}`),
-      });
-    }
-
-    Alert.alert(
-      'Contact Owner',
-      `How would you like to contact ${detailedListing.owner.name}?`,
-      alertButtons,
-    );
+    router.push(`/messages/${detailedListing.owner.id}`);
   };
 
   const handleBookingOrPurchase = () => {

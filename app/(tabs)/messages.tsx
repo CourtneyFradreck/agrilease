@@ -7,10 +7,14 @@ import {
   TouchableOpacity,
   FlatList,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
+import { useConversations } from '@/hooks/useConversations';
+import { Conversation } from '@/utils/types';
+import { getAuth } from 'firebase/auth';
 
 const MAIN_COLOR = '#4D7C0F';
 const HEADER_TEXT_COLOR = '#FFFFFF';
@@ -21,46 +25,15 @@ const CARD_BACKGROUND = '#FFFFFF';
 const BORDER_GREY = '#E5E5E5';
 const BORDER_RADIUS = 8;
 
-interface Conversation {
-  id: string;
-  name: string;
-  lastMessage: string;
-  timestamp: Date;
-  unreadCount?: number;
-}
-
-const mockConversations: Conversation[] = [
-  {
-    id: 'JohnDoe',
-    name: 'John Doe',
-    lastMessage: 'Regarding the tractor, it will be available from 28th.',
-    timestamp: dayjs().subtract(2, 'hour').toDate(),
-    unreadCount: 1,
-  },
-  {
-    id: 'JaneSmith',
-    name: 'Jane Smith',
-    lastMessage: 'Confirming pickup for the harvester tomorrow morning.',
-    timestamp: dayjs().subtract(1, 'day').toDate(),
-  },
-  {
-    id: 'AgriCorpSupport',
-    name: 'AgriCorp Support',
-    lastMessage: 'Your payment for equipment ID #123 was successful.',
-    timestamp: dayjs().subtract(3, 'day').toDate(),
-  },
-  {
-    id: 'FarmTechSolutions',
-    name: 'Farm Tech Solutions',
-    lastMessage: 'New irrigation pumps just arrived! Check them out.',
-    timestamp: dayjs().subtract(1, 'week').toDate(),
-  },
-];
-
 export default function MessagesInboxScreen() {
   const router = useRouter();
+  const { conversations, loading } = useConversations();
+  const auth = getAuth();
+  const currentUserId = auth.currentUser?.uid;
 
-  const formatTimestamp = (date: Date): string => {
+  const formatTimestamp = (timestamp: any): string => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     const now = dayjs();
     const messageDate = dayjs(date);
 
@@ -76,39 +49,60 @@ export default function MessagesInboxScreen() {
     return messageDate.format('MMM D, YYYY');
   };
 
-  const renderConversationItem = ({ item }: { item: Conversation }) => (
-    <TouchableOpacity
-      style={styles.conversationItem}
-      onPress={() => router.push(`/messages/${item.id}`)}
-      activeOpacity={0.8}
-    >
-      <View style={styles.avatarPlaceholder}>
-        <MaterialIcons name="person" size={30} color={HEADER_TEXT_COLOR} />
+  const renderConversationItem = ({ item }: { item: Conversation }) => {
+    const otherParticipantId = item.participants.find(
+      (p) => p !== currentUserId
+    );
+
+    return (
+      <TouchableOpacity
+        style={styles.conversationItem}
+        onPress={() =>
+          router.push(`/messages/${otherParticipantId}?conversationId=${item.id}`)
+        }
+        activeOpacity={0.8}
+      >
+        <View style={styles.avatarPlaceholder}>
+          <MaterialIcons name="person" size={30} color={HEADER_TEXT_COLOR} />
+        </View>
+        <View style={styles.conversationTextContent}>
+          <Text style={styles.conversationName}>{otherParticipantId}</Text>
+          <Text
+            style={[
+              styles.lastMessage,
+              item.unreadMessages &&
+                item.unreadMessages[currentUserId || ''] > 0 &&
+                styles.unreadLastMessage,
+            ]}
+            numberOfLines={1}
+          >
+            {item.lastMessage}
+          </Text>
+        </View>
+        <View style={styles.rightContent}>
+          <Text style={styles.messageTime}>
+            {formatTimestamp(item.lastMessageTimestamp)}
+          </Text>
+          {item.unreadMessages && item.unreadMessages[currentUserId || ''] > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadText}>
+                {item.unreadMessages[currentUserId || '']}
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={MAIN_COLOR} />
+        <Text>Loading conversations...</Text>
       </View>
-      <View style={styles.conversationTextContent}>
-        <Text style={styles.conversationName}>{item.name}</Text>
-        <Text
-          style={[
-            styles.lastMessage,
-            item.unreadCount && styles.unreadLastMessage,
-          ]}
-          numberOfLines={1}
-        >
-          {item.lastMessage}
-        </Text>
-      </View>
-      <View style={styles.rightContent}>
-        <Text style={styles.messageTime}>
-          {formatTimestamp(item.timestamp)}
-        </Text>
-        {item.unreadCount && item.unreadCount > 0 && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadText}>{item.unreadCount}</Text>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -122,10 +116,15 @@ export default function MessagesInboxScreen() {
       </SafeAreaView>
 
       <FlatList
-        data={mockConversations}
+        data={conversations}
         renderItem={renderConversationItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id!}
         contentContainerStyle={styles.listContent}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No conversations yet.</Text>
+          </View>
+        )}
       />
     </View>
   );
@@ -239,5 +238,20 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Bold',
     fontSize: 12,
     color: HEADER_TEXT_COLOR,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: TEXT_SECONDARY_GREY,
   },
 });

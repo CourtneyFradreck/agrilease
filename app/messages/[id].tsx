@@ -9,14 +9,26 @@ import {
   KeyboardAvoidingView,
   Platform,
   FlatList,
-  Dimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
-
-const { width, height } = Dimensions.get('window');
+import { getAuth } from 'firebase/auth';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+} from 'firebase/firestore';
+import { db } from '@/FirebaseConfig';
+import { useMessages } from '@/hooks/useMessages';
+import { Message } from '@/utils/types';
 
 const BORDER_RADIUS = 8;
 const MAIN_COLOR = '#4D7C0F';
@@ -32,57 +44,75 @@ const RECEIVER_BUBBLE_COLOR = '#E5E7EB';
 const SENDER_TEXT_COLOR = '#FFFFFF';
 const RECEIVER_TEXT_COLOR = TEXT_PRIMARY_DARK;
 
-interface Message {
-  id: string;
-  senderId: string;
-  receiverId: string;
-  text: string;
-  timestamp: Date;
-}
-
-const myUserId = 'user123';
-
-const mockConversationMessages: Message[] = [
-  {
-    id: 'm1',
-    senderId: 'otherUser456',
-    receiverId: myUserId,
-    text: 'Hi there! Is the John Deere 6100R available for rent next week?',
-    timestamp: dayjs().subtract(2, 'hour').toDate(),
-  },
-  {
-    id: 'm2',
-    senderId: myUserId,
-    receiverId: 'otherUser456',
-    text: 'Hello! Yes, it should be. Which days are you looking at?',
-    timestamp: dayjs().subtract(1, 'hour').toDate(),
-  },
-  {
-    id: 'm3',
-    senderId: 'otherUser456',
-    receiverId: myUserId,
-    text: 'Great! I need it from June 28th to July 5th. What are the rates for that period?',
-    timestamp: dayjs().subtract(30, 'minute').toDate(),
-  },
-  {
-    id: 'm4',
-    senderId: myUserId,
-    receiverId: 'otherUser456',
-    text: 'For those dates, it would be $150 per day. I can confirm availability for you now if you like.',
-    timestamp: dayjs().subtract(5, 'minute').toDate(),
-  },
-];
-
 export default function MessageScreen() {
   const router = useRouter();
-  // The ID could be a userId or a conversationId
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: otherUserId, conversationId: initialConversationId } =
+    useLocalSearchParams<{ id: string; conversationId?: string }>();
 
-  const conversationPartnerName = id || 'Unknown User';
-
-  const [messages, setMessages] = useState<Message[]>(mockConversationMessages);
+  const [conversationId, setConversationId] = useState(initialConversationId);
+  const [isFindingConversation, setIsFindingConversation] = useState(true);
   const [newMessageText, setNewMessageText] = useState('');
+  const [otherUserName, setOtherUserName] = useState('');
   const flatListRef = useRef<FlatList>(null);
+  const auth = getAuth();
+  const currentUserId = auth.currentUser?.uid;
+
+  const {
+    messages,
+    loading: messagesLoading,
+    sendMessage: sendMessageHook,
+  } = useMessages(conversationId || '');
+
+  useEffect(() => {
+    const fetchOtherUserName = async () => {
+      if (!otherUserId) return;
+      const userDocRef = doc(db, 'users', otherUserId);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        setOtherUserName(userDocSnap.data().name);
+      } else {
+        setOtherUserName('Unknown User');
+      }
+    };
+
+    fetchOtherUserName();
+  }, [otherUserId]);
+
+  useEffect(() => {
+    const findOrCreateConversation = async () => {
+      if (!currentUserId || !otherUserId) return;
+
+      if (initialConversationId) {
+        setConversationId(initialConversationId);
+        setIsFindingConversation(false);
+        return;
+      }
+
+      setIsFindingConversation(true);
+      const conversationsRef = collection(db, 'conversations');
+      const q = query(
+        conversationsRef,
+        where('participants', 'array-contains', currentUserId),
+      );
+
+      const querySnapshot = await getDocs(q);
+      let existingConversationId: string | null = null;
+
+      querySnapshot.forEach((doc) => {
+        const conversation = doc.data();
+        if (conversation.participants.includes(otherUserId)) {
+          existingConversationId = doc.id;
+        }
+      });
+
+      if (existingConversationId) {
+        setConversationId(existingConversationId);
+      }
+      setIsFindingConversation(false);
+    };
+
+    findOrCreateConversation();
+  }, [currentUserId, otherUserId, initialConversationId]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -90,28 +120,34 @@ export default function MessageScreen() {
     }
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (newMessageText.trim() === '') {
-      Alert.alert('Empty Message', 'Please type a message before sending.');
+  const handleSendMessage = async () => {
+    if (newMessageText.trim() === '' || !currentUserId || !otherUserId) {
+      Alert.alert('Error', 'Could not send message.');
       return;
     }
 
-    const newMessage: Message = {
-      id: `m${messages.length + 1}`,
-      senderId: myUserId,
-      receiverId: id || 'otherUser456',
-      text: newMessageText.trim(),
-      timestamp: new Date(),
-    };
+    let convId = conversationId;
+    if (!convId) {
+      const newConversationRef = await addDoc(collection(db, 'conversations'), {
+        participants: [currentUserId, otherUserId],
+        lastMessage: newMessageText.trim(),
+        lastMessageTimestamp: serverTimestamp(),
+        lastMessageSenderId: currentUserId,
+        unreadMessages: { [otherUserId]: 1 },
+      });
+      convId = newConversationRef.id;
+      setConversationId(convId);
+    }
 
-    setMessages((prevMessages) => [...prevMessages, newMessage]);
+    await sendMessageHook(newMessageText.trim(), otherUserId, convId);
     setNewMessageText('');
-    console.log('Sending message:', newMessage);
   };
 
   const renderMessageBubble = ({ item }: { item: Message }) => {
-    const isMyMessage = item.senderId === myUserId;
-    const messageTime = dayjs(item.timestamp).format('h:mm A');
+    const isMyMessage = item.senderId === currentUserId;
+    const messageTime = item.timestamp
+      ? dayjs((item.timestamp as any).toDate()).format('h:mm A')
+      : '';
 
     return (
       <View
@@ -151,6 +187,24 @@ export default function MessageScreen() {
     );
   };
 
+  if (isFindingConversation) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={MAIN_COLOR} />
+        <Text>Starting conversation...</Text>
+      </View>
+    );
+  }
+
+  if (messagesLoading && !messages.length) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={MAIN_COLOR} />
+        <Text>Loading messages...</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.fullScreenContainer}>
       <View style={styles.header}>
@@ -165,7 +219,7 @@ export default function MessageScreen() {
             color={HEADER_TEXT_COLOR}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{conversationPartnerName}</Text>
+        <Text style={styles.headerTitle}>{otherUserName || 'Chat'}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -173,7 +227,7 @@ export default function MessageScreen() {
         ref={flatListRef}
         data={messages}
         renderItem={renderMessageBubble}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id || Math.random().toString()}
         contentContainerStyle={styles.messagesListContent}
         onContentSizeChange={() =>
           flatListRef.current?.scrollToEnd({ animated: true })
@@ -328,5 +382,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
