@@ -25,6 +25,7 @@ import {
   serverTimestamp,
   doc,
   getDoc,
+  updateDoc,
 } from 'firebase/firestore';
 import { db } from '@/FirebaseConfig';
 import { useMessages } from '@/hooks/useMessages';
@@ -52,7 +53,6 @@ export default function MessageScreen() {
   const [conversationId, setConversationId] = useState(initialConversationId);
   const [isFindingConversation, setIsFindingConversation] = useState(true);
   const [newMessageText, setNewMessageText] = useState('');
-  const [otherUserName, setOtherUserName] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const auth = getAuth();
   const currentUserId = auth.currentUser?.uid;
@@ -62,6 +62,8 @@ export default function MessageScreen() {
     loading: messagesLoading,
     sendMessage: sendMessageHook,
   } = useMessages(conversationId || '');
+
+  const [otherUserName, setOtherUserName] = useState('');
 
   useEffect(() => {
     const fetchOtherUserName = async () => {
@@ -90,29 +92,37 @@ export default function MessageScreen() {
 
       setIsFindingConversation(true);
       const conversationsRef = collection(db, 'conversations');
+      // Query for conversations where both the current user and the other user are participants
       const q = query(
         conversationsRef,
-        where('participants', 'array-contains', currentUserId),
+        where('participants', '==', [currentUserId, otherUserId].sort()),
       );
 
       const querySnapshot = await getDocs(q);
-      let existingConversationId: string | null = null;
 
-      querySnapshot.forEach((doc) => {
-        const conversation = doc.data();
-        if (conversation.participants.includes(otherUserId)) {
-          existingConversationId = doc.id;
-        }
-      });
-
-      if (existingConversationId) {
-        setConversationId(existingConversationId);
+      if (!querySnapshot.empty) {
+        // Conversation already exists
+        const conversationDoc = querySnapshot.docs[0];
+        setConversationId(conversationDoc.id);
+      } else {
+        // Conversation does not exist, so we don't set a conversationId
+        // It will be created when the first message is sent.
       }
       setIsFindingConversation(false);
     };
 
     findOrCreateConversation();
   }, [currentUserId, otherUserId, initialConversationId]);
+
+  useEffect(() => {
+    // Mark messages as read when the conversation is opened
+    if (conversationId && currentUserId) {
+      const conversationRef = doc(db, 'conversations', conversationId);
+      updateDoc(conversationRef, {
+        [`unreadMessages.${currentUserId}`]: 0,
+      });
+    }
+  }, [conversationId, currentUserId]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -129,11 +139,11 @@ export default function MessageScreen() {
     let convId = conversationId;
     if (!convId) {
       const newConversationRef = await addDoc(collection(db, 'conversations'), {
-        participants: [currentUserId, otherUserId],
+        participants: [currentUserId, otherUserId].sort(),
         lastMessage: newMessageText.trim(),
         lastMessageTimestamp: serverTimestamp(),
         lastMessageSenderId: currentUserId,
-        unreadMessages: { [otherUserId]: 1 },
+        unreadMessages: { [otherUserId]: 1, [currentUserId]: 0 },
       });
       convId = newConversationRef.id;
       setConversationId(convId);
