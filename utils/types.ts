@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore";
+
 export interface GeoPoint {
   latitude: number;
   longitude: number;
@@ -85,4 +87,23 @@ export interface Review {
   rating: number;
   comment?: string;
   createdAt: number;
+}
+
+export interface Message {
+  id?: string;
+  conversationId: string;
+  senderId: string;
+  receiverId: string;
+  text: string;
+  timestamp: Timestamp | number; // Use Timestamp for Firestore or number for local time
+  isRead: boolean;
+}
+
+export interface Conversation {
+  id?: string;
+  participants: string[];
+  lastMessage: string;
+  lastMessageTimestamp: Timestamp | number;
+  lastMessageSenderId: string;
+  unreadMessages: { [userId: string]: number };
 }
