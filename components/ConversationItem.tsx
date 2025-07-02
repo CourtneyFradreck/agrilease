@@ -58,16 +58,23 @@ export default function ConversationItem({
 
   useEffect(() => {
     let isMounted = true;
+
     if (otherParticipantId) {
       const userRef = doc(db, 'users', otherParticipantId);
-      getDoc(userRef).then((docSnap) => {
-        if (isMounted && docSnap.exists()) {
-          setOtherUser({ id: docSnap.id, ...docSnap.data() } as User);
-        }
-      }).catch(error => {
-        console.error("Error fetching user data:", error);
-      });
+      getDoc(userRef)
+        .then((docSnap) => {
+          if (!isMounted) return;
+          if (docSnap.exists()) {
+            setOtherUser({ id: docSnap.id, ...docSnap.data() } as User);
+          }
+        })
+        .catch((error) => {
+          if (!isMounted) return;
+          console.error('Error fetching user data: ', error);
+          setOtherUser({ id: otherParticipantId, name: 'Unknown User' } as User);
+        });
     }
+
     return () => {
       isMounted = false;
     };
