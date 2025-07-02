@@ -50,23 +50,27 @@ export const useMessages = (conversationId: string) => {
   ) => {
     if (!currentUserId || !convId) return;
 
-    await addDoc(collection(db, 'messages'), {
-      conversationId: convId,
-      senderId: currentUserId,
-      receiverId,
-      text,
-      timestamp: serverTimestamp(),
-      isRead: false,
-    });
+    try {
+      await addDoc(collection(db, 'messages'), {
+        conversationId: convId,
+        senderId: currentUserId,
+        receiverId,
+        text,
+        timestamp: serverTimestamp(),
+        isRead: false,
+      });
 
-    // Also update the conversation's last message
-    const conversationRef = doc(db, 'conversations', convId);
-    await updateDoc(conversationRef, {
-      lastMessage: text,
-      lastMessageTimestamp: serverTimestamp(),
-      lastMessageSenderId: currentUserId,
-      [`unreadMessages.${receiverId}`]: increment(1),
-    });
+      // Also update the conversation's last message
+      const conversationRef = doc(db, 'conversations', convId);
+      await updateDoc(conversationRef, {
+        lastMessage: text,
+        lastMessageTimestamp: serverTimestamp(),
+        lastMessageSenderId: currentUserId,
+        [`unreadMessages.${receiverId}`]: increment(1),
+      });
+    } catch (error) {
+      console.error('Error sending message: ', error);
+    }
   };
 
   return { messages, loading, sendMessage };

@@ -11,7 +11,11 @@ export const useConversations = () => {
   const currentUserId = auth.currentUser?.uid;
 
   useEffect(() => {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+      setConversations([]);
+      setLoading(false);
+      return;
+    }
 
     const q = query(
       collection(db, 'conversations'),
@@ -25,6 +29,9 @@ export const useConversations = () => {
         convos.push({ id: doc.id, ...doc.data() } as Conversation);
       });
       setConversations(convos);
+      setLoading(false);
+    }, (error) => {
+      console.error('Error fetching conversations: ', error);
       setLoading(false);
     });
 
