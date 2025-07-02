@@ -57,14 +57,20 @@ export default function ConversationItem({
   );
 
   useEffect(() => {
+    let isMounted = true;
     if (otherParticipantId) {
       const userRef = doc(db, 'users', otherParticipantId);
       getDoc(userRef).then((docSnap) => {
-        if (docSnap.exists()) {
+        if (isMounted && docSnap.exists()) {
           setOtherUser({ id: docSnap.id, ...docSnap.data() } as User);
         }
+      }).catch(error => {
+        console.error("Error fetching user data:", error);
       });
     }
+    return () => {
+      isMounted = false;
+    };
   }, [otherParticipantId]);
 
   const unreadCount = item.unreadMessages?.[currentUserId] || 0;
