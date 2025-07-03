@@ -31,6 +31,8 @@ import {
   BookingSchema,
 } from '@/utils/validators';
 import { ListingCard } from '@/components/ListingCard';
+import { imagepicker } from 'expo';
+import * from firebase as 'firebase';
 
 type EquipmentFromDB = z.infer<typeof EquipmentSchema>;
 type ListingFromDB = z.infer<typeof ListingSchema>;
@@ -117,7 +119,7 @@ export default function Profile() {
             });
             fetchedBookings.push({
               ...bookingData,
-              listing: { ...listingData, equipment: equipmentData },
+              listing: { ...listingData, equipment: equipmentData }, 
             });
           } else {
             console.warn(
@@ -195,6 +197,40 @@ export default function Profile() {
   useEffect(() => {
     fetchMyListings();
   }, [fetchMyListings]);
+
+  //image upload handling
+
+  const chooseImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (permissionResult.granted === false) {
+      Alert.alert('Permission to access camera roll is required!');
+      return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync();
+
+    if (!result.canceled) {
+      setSelectedImage(result.assets[0].uri);
+      await uploadImage(result.assets[0].uri, "profile_image");
+    }
+  };
+
+  //uploading the image to firebase
+
+  const uploadImage = async (uri: string, imageName: string) => {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const ref = firebase.storage().ref().child("profile_images/" + imageName);
+    return ref.put(blob)
+      .then(() => {
+        Alert.alert("Successfully uploaded");
+      })
+      .catch((error) => {
+        Alert.alert(error.message);
+      });
+  };
+
 
   if (!currentUser) {
     return (
@@ -474,6 +510,13 @@ export default function Profile() {
               </View>
             </View>
           </View>
+
+          <Button
+            text="Choose Image"
+            onPress={chooseImage}
+            style={styles.actionButtonPrimary}
+            textStyle={styles.actionButtonPrimaryText}
+          />
         </View>
 
         <View style={styles.tabsSection}>
