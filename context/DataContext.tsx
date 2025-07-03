@@ -1,8 +1,9 @@
+"use client"
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import type { RentalEquipment, MarketplaceItem, Booking } from "@/types/equipment"
-import { db } from "@/config/firebase"
+import { db } from "@/config/firebase";
 import {
   collection,
   onSnapshot,
@@ -120,7 +121,7 @@ export function DataProvider({ children }: DataProviderProps) {
             price: typeof data.price === "number" ? data.price : Number.parseFloat(data.price),
             location: data.location,
 
-        
+            // Support both old and new image fields
             image: data.mainImage || data.image, // Use Firebase Storage URL if available
             mainImage: data.mainImage, // Firebase Storage URL
             mainImagePath: data.mainImagePath, // Firebase Storage path
@@ -193,7 +194,7 @@ export function DataProvider({ children }: DataProviderProps) {
         ...equipment,
         owner: {
           id: currentUser.id,
-          fullname: currentUser.fullname,
+          fullname: currentUser.name,
         },
         rating: 0,
         reviewCount: 0,
@@ -220,7 +221,7 @@ export function DataProvider({ children }: DataProviderProps) {
         ...item,
         seller: {
           id: currentUser.id,
-          fullname: currentUser.fullname,
+          fullname: currentUser.name,
         },
         images: [], // Initialize empty images array for Firebase Storage
         createdAt: serverTimestamp(),

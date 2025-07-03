@@ -31,8 +31,11 @@ import {
   BookingSchema,
 } from '@/utils/validators';
 import { ListingCard } from '@/components/ListingCard';
-import { imagepicker } from 'expo';
 import * from firebase as 'firebase';
+
+import * as ImagePicker from 'expo-image-picker';
+import { Alert } from 'react-native';
+import { uploadImage } from '@/utils/storage-utils';
 
 type EquipmentFromDB = z.infer<typeof EquipmentSchema>;
 type ListingFromDB = z.infer<typeof ListingSchema>;
@@ -200,37 +203,39 @@ export default function Profile() {
 
   //image upload handling
 
-  const chooseImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+const [selectedImage, setSelectedImage] = useState<string | null>(null);
+ const chooseImage = async () => {
+   const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+ 
+   if (permissionResult.granted === false) {
+     Alert.alert('Permission to access camera roll is required!');
+     return;
+   }
+ 
+   let result = await ImagePicker.launchImageLibraryAsync();
+ 
+   if (!result.canceled) {
+     setSelectedImage(result.assets[0].uri);
+     await uploadImage(result.assets[0].uri, "profile_images", currentUser?.id || '');
+   }
+ };
 
-    if (permissionResult.granted === false) {
-      Alert.alert('Permission to access camera roll is required!');
-      return;
-    }
 
-    let result = await ImagePicker.launchImageLibraryAsync();
-
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
-      await uploadImage(result.assets[0].uri, "profile_image");
-    }
-  };
-
-  //uploading the image to firebase
-
-  const uploadImage = async (uri: string, imageName: string) => {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const ref = firebase.storage().ref().child("profile_images/" + imageName);
-    return ref.put(blob)
-      .then(() => {
-        Alert.alert("Successfully uploaded");
-      })
-      .catch((error) => {
-        Alert.alert(error.message);
-      });
-  };
-
+  // In chooseImage function:
+try {
+  const result = await uploadImage(
+    result.assets[0].uri, 
+    "profile_images", 
+    currentUser?.id || '', 
+    undefined
+  );
+  Alert.alert("Success", "Profile image uploaded successfully");
+  // Update user profile with the new image URL
+  // You may want to update Firestore with result.url
+} catch (error) {
+  Alert.alert("Error", "Failed to upload image");
+  console.error(error);
+}
 
   if (!currentUser) {
     return (
