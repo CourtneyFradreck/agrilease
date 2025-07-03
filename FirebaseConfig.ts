@@ -3,6 +3,7 @@ import { getFirestore, collection, addDoc, getDocs } from 'firebase/firestore';
 import { getStorage } from "firebase/storage"
 import { Platform } from 'react-native';
 
+
 // Import Auth, but not the persistence function yet
 import { initializeAuth, getAuth, Auth } from "firebase/auth"; 
 
@@ -26,6 +27,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app)
+
 
 // --- THE FIX: Conditionally initialize Auth for Native vs. Web --- 
 let auth: Auth;
@@ -63,4 +65,4 @@ export async function testDatabaseConnection() {
   }
 }
 
-export { db, auth, analytics }; 
+export { db, auth, analytics, storage };
