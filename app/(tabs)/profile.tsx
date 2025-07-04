@@ -221,21 +221,6 @@ const [selectedImage, setSelectedImage] = useState<string | null>(null);
  };
 
 
-  // In chooseImage function:
-try {
-  const result = await uploadImage(
-    result.assets[0].uri, 
-    "profile_images", 
-    currentUser?.id || '', 
-    undefined
-  );
-  Alert.alert("Success", "Profile image uploaded successfully");
-  // Update user profile with the new image URL
-  // You may want to update Firestore with result.url
-} catch (error) {
-  Alert.alert("Error", "Failed to upload image");
-  console.error(error);
-}
 
   if (!currentUser) {
     return (
