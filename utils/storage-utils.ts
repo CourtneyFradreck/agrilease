@@ -1,82 +1,95 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"
 import { doc, updateDoc } from "firebase/firestore"
-import { storage, db } from "../config/firebase"
+import { storage, db } from "../FirebaseConfig"
 
 export interface UploadResult {
   url: string
   path: string
 }
 
-export async function uploadImage(
+export const uploadImage = async (
   uri: string,
-  folder: "profiles" | "equipment",
+  folder: string,
   userId: string,
-  itemId?: string,
-): Promise<UploadResult> {
+  equipmentId?: string,
+): Promise<UploadResult> => {
   try {
-    // Fetch the image as a blob
+    // Convert URI to blob for upload
     const response = await fetch(uri)
     const blob = await response.blob()
 
-    // Create a unique filename
+    // Create unique filename
     const timestamp = Date.now()
-    const fileName = `${timestamp}-image.jpg`
+    const filename = `${timestamp}_${Math.random().toString(36).substring(7)}.jpg`
+    const path = `${folder}/${userId}/${equipmentId || "profile"}/${filename}`
 
-    // Create storage reference
-    const storageRef = ref(storage, `${folder}/${userId}/${fileName}`)
-
-    // Upload file
-    const snapshot = await uploadBytes(storageRef, blob)
+    // Create storage reference and upload
+    const storageRef = ref(storage, path)
+    await uploadBytes(storageRef, blob)
 
     // Get download URL
-    const downloadURL = await getDownloadURL(snapshot.ref)
+    const url = await getDownloadURL(storageRef)
 
-    return {
-      url: downloadURL,
-      path: snapshot.ref.fullPath,
-    }
+    return { url, path }
   } catch (error) {
-    console.error("Error uploading image:", error)
-    throw new Error("Failed to upload image")
+    console.error("Upload error:", error)
+    throw error
   }
 }
 
-export async function deleteImage(imagePath: string): Promise<void> {
+export const deleteImage = async (path: string): Promise<void> => {
   try {
-    const imageRef = ref(storage, imagePath)
-    await deleteObject(imageRef)
+    const storageRef = ref(storage, path)
+    await deleteObject(storageRef)
   } catch (error) {
-    console.error("Error deleting image:", error)
-    throw new Error("Failed to delete image")
+    console.error("Delete error:", error)
+    throw error
   }
 }
 
-export async function updateProfileImage(userId: string, imageUrl: string, imagePath: string): Promise<void> {
+export const updateProfileImage = async (userId: string, imageUrl: string, imagePath: string): Promise<void> => {
   try {
     const userRef = doc(db, "users", userId)
     await updateDoc(userRef, {
       profileImage: imageUrl,
       profileImagePath: imagePath,
-      updatedAt: new Date(),
     })
   } catch (error) {
     console.error("Error updating profile image:", error)
-    throw new Error("Failed to update profile image")
+    throw error
   }
 }
 
-export async function updateEquipmentImages(
+export const updateEquipmentImages = async (
   equipmentId: string,
   images: Array<{ url: string; path: string }>,
-): Promise<void> {
+): Promise<void> => {
   try {
-    const equipmentRef = doc(db, "equipment", equipmentId)
+    const equipmentRef = doc(db, "rentalEquipment", equipmentId)
     await updateDoc(equipmentRef, {
       images: images,
-      updatedAt: new Date(),
+      mainImage: images.length > 0 ? images[0].url : null,
     })
   } catch (error) {
     console.error("Error updating equipment images:", error)
-    throw new Error("Failed to update equipment images")
+    throw error
+  }
+}
+
+// NEW: Function to update marketplace item images
+export const updateMarketplaceImages = async (
+  itemId: string,
+  images: { url: string; path: string }[],
+): Promise<void> => {
+  try {
+    const itemRef = doc(db, "marketplaceItems", itemId)
+    await updateDoc(itemRef, {
+      images: images,
+      mainImage: images.length > 0 ? images[0].url : null,
+      mainImagePath: images.length > 0 ? images[0].path : null,
+    })
+  } catch (error) {
+    console.error("Error updating marketplace item images in Firestore:", error)
+    throw error
   }
 }

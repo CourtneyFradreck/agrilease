@@ -31,6 +31,11 @@ import {
   BookingSchema,
 } from '@/utils/validators';
 import { ListingCard } from '@/components/ListingCard';
+import * from firebase as 'firebase';
+
+import * as ImagePicker from 'expo-image-picker';
+import { Alert } from 'react-native';
+import { uploadImage } from '@/utils/storage-utils';
 
 type EquipmentFromDB = z.infer<typeof EquipmentSchema>;
 type ListingFromDB = z.infer<typeof ListingSchema>;
@@ -117,7 +122,7 @@ export default function Profile() {
             });
             fetchedBookings.push({
               ...bookingData,
-              listing: { ...listingData, equipment: equipmentData },
+              listing: { ...listingData, equipment: equipmentData }, 
             });
           } else {
             console.warn(
@@ -195,6 +200,27 @@ export default function Profile() {
   useEffect(() => {
     fetchMyListings();
   }, [fetchMyListings]);
+
+  //image upload handling
+
+const [selectedImage, setSelectedImage] = useState<string | null>(null);
+ const chooseImage = async () => {
+   const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+ 
+   if (permissionResult.granted === false) {
+     Alert.alert('Permission to access camera roll is required!');
+     return;
+   }
+ 
+   let result = await ImagePicker.launchImageLibraryAsync();
+ 
+   if (!result.canceled) {
+     setSelectedImage(result.assets[0].uri);
+     await uploadImage(result.assets[0].uri, "profile_images", currentUser?.id || '');
+   }
+ };
+
+
 
   if (!currentUser) {
     return (
@@ -474,6 +500,13 @@ export default function Profile() {
               </View>
             </View>
           </View>
+
+          <Button
+            text="Choose Image"
+            onPress={chooseImage}
+            style={styles.actionButtonPrimary}
+            textStyle={styles.actionButtonPrimaryText}
+          />
         </View>
 
         <View style={styles.tabsSection}>
