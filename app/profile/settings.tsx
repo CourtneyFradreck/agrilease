@@ -106,15 +106,15 @@ export default function SettingsScreen() {
               color={TEXT_SECONDARY_GREY}
             />
           </TouchableOpacity>
-          <TouchableOpacity
+            <TouchableOpacity
             style={styles.settingItem}
-            onPress={() => navigateTo('/notifications-settings')}
-          >
+            onPress={() => navigateTo('/notifications')}
+            >
             <View style={styles.settingItemContent}>
               <MaterialIcons
-                name="notifications-none"
-                size={24}
-                color={TEXT_PRIMARY_DARK}
+              name="notifications-none"
+              size={24}
+              color={TEXT_PRIMARY_DARK}
               />
               <Text style={styles.settingItemText}>Notifications</Text>
             </View>
@@ -123,7 +123,7 @@ export default function SettingsScreen() {
               size={20}
               color={TEXT_SECONDARY_GREY}
             />
-          </TouchableOpacity>
+            </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
