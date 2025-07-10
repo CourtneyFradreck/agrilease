@@ -31,7 +31,6 @@ import {
   BookingSchema,
 } from '@/utils/validators';
 import { ListingCard } from '@/components/ListingCard';
-import * from firebase as 'firebase';
 
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
