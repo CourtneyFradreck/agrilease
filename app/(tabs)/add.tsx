@@ -19,6 +19,9 @@ import { db } from '@/FirebaseConfig';
 import { EquipmentSchema, ListingSchema } from '@/utils/validators';
 import { MaterialIcons } from '@expo/vector-icons';
 import { z } from 'zod';
+import * as ImagePicker from 'expo-image-picker';
+import { Feather } from '@expo/vector-icons';
+import { Image } from 'react-native';
 
 // --- Constants ---
 const BORDER_RADIUS = 8;
@@ -48,6 +51,7 @@ export default function AddListing() {
   const [locationAddress, setLocationAddress] = useState('');
   const [listingType, setListingType] = useState<ListingType>('rental');
   const [rentalUnit, setRentalUnit] = useState<RentalUnit>('day');
+  const [image, setImage] = useState<string | null>(null);
 
   const [condition, setCondition] = useState<EquipmentCondition | ''>('');
   const [year, setYear] = useState('');
@@ -67,6 +71,74 @@ export default function AddListing() {
     'Irrigation',
     'Other',
   ];
+
+    // Function to handle image picking from camera
+  const pickImageFromCamera = async () => {
+    // Request camera permissions
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'We need camera permissions to take a photo');
+      return;
+    }
+
+    // Launch camera
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      if (result.assets && result.assets.length > 0 && result.assets[0].uri) {
+        setImage(result.assets[0].uri);
+      } else {
+        console.warn('Camera: No image URI found in result.assets[0].');
+        Alert.alert('Error', 'Could not get image from camera. Please try again.');
+      }
+    }
+  };
+
+  // Function to handle image picking from gallery
+  const pickImageFromGallery = async () => {
+    // Request media library permissions
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'We need media library permissions to select a photo');
+      return;
+    }
+
+    // Launch image library
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      if (result.assets && result.assets.length > 0 && result.assets[0].uri) {
+        setImage(result.assets[0].uri);
+      } else {
+        console.warn('Gallery: No image URI found in result.assets[0].');
+        Alert.alert('Error', 'Could not get image from gallery. Please try again.');
+      }
+    }
+  };
+
+  // Function to prompt user to choose camera or gallery
+  const handleAddPhoto = () => {
+    Alert.alert(
+      'Add Photo',
+      'Choose an option',
+      [
+        { text: 'Take Photo', onPress: pickImageFromCamera },
+        { text: 'Choose from Gallery', onPress: pickImageFromGallery },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+  
 
   const equipmentConditions: EquipmentCondition[] = [
     'Excellent',
@@ -318,6 +390,35 @@ export default function AddListing() {
               value={name}
               onChangeText={setName}
             />
+          </View>
+
+          <View style={styles.photoUploadContainer}>
+            <TouchableOpacity 
+              style={styles.photoUploadButton}
+              onPress={handleAddPhoto}
+            >
+              {image ? (
+                <Image 
+                  source={{ uri: image }} 
+                  style={styles.previewImage} 
+                  resizeMode="cover"
+                />
+              ) : (
+                <>
+                  <Feather name="camera" size={40} color="#6B7280" />
+                  <Text style={styles.photoUploadText}>Add Photos *</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {image && (
+              <TouchableOpacity 
+                style={styles.changePhotoButton}
+                onPress={handleAddPhoto}
+              >
+                <Feather name="edit" size={16} color="#FFFFFF" />
+                <Text style={styles.changePhotoText}>Change Photo</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Equipment Type Selector */}
@@ -719,5 +820,47 @@ const styles = StyleSheet.create({
     fontFamily: 'Archivo-Bold',
     fontSize: 16,
     color: HEADER_TEXT_COLOR,
+  },
+   photoUploadContainer: {
+    marginBottom: 20,
+    position: 'relative',
+  },
+  photoUploadButton: {
+    height: 160,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  photoUploadText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 8,
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  changePhotoButton: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  changePhotoText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+    color: '#FFFFFF',
+    marginLeft: 6,
   },
 });
