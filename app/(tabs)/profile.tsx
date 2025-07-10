@@ -14,7 +14,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Button } from '@/components/Button';
+
 import { db } from '@/FirebaseConfig';
 import {
   collection,
@@ -201,61 +201,6 @@ export default function Profile() {
   }, [fetchMyListings]);
 
   //image upload handling
-
-// Fixed chooseImage function with proper error handling and profile update
-const [uploadingImage, setUploadingImage] = useState(false);
-const { updateProfile } = useAuth(); // Get updateProfile from AuthContext
-
-const chooseImage = async () => {
-  const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-  if (permissionResult.granted === false) {
-    Alert.alert('Permission Required', 'Permission to access camera roll is required!');
-    return;
-  }
-
-  let result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: true,
-    aspect: [1, 1],
-    quality: 0.8,
-  });
-
-  if (!result.canceled && currentUser?.id) {
-    setUploadingImage(true);
-    
-    try {
-      // Upload the image to Firebase Storage
-      const uploadResult = await uploadImage(result.assets[0].uri, "profile_images", currentUser.id);
-      
-      // Update the user's profile using the AuthContext updateProfile method
-      // This will handle both Firestore update and local state update
-      const updateSuccess = await updateProfile({ 
-        profileImageUrl: uploadResult.url 
-      });
-      
-      if (updateSuccess) {
-        Alert.alert('Success', 'Profile image updated successfully!');
-        console.log('Profile image updated successfully:', uploadResult.url);
-      } else {
-        throw new Error('Failed to update profile in database');
-      }
-      
-    } catch (error) {
-      console.error('Error uploading/updating profile image:', error);
-      Alert.alert(
-        'Upload Failed', 
-        'Failed to upload image. Please try again.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setUploadingImage(false);
-    }
-  }
-};
-
-// Note: Make sure you have the uploadImage utility function imported
-// import { uploadImage } from '@/utils/storage-utils';
 
 
 
@@ -487,64 +432,63 @@ const chooseImage = async () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollViewContentContainer}
       >
-        <View style={styles.profileSummarySection}>
-          <View style={styles.profileInfoTopSection}>
-            <Image
-              source={{
-                uri: currentUser.profileImageUrl || DEFAULT_PROFILE_IMAGE,
-              }}
-              style={styles.profileImageLeft}
-            />
-            <View style={styles.userInfoRight}>
-              <Text style={styles.name} numberOfLines={1}>
-                {currentUser.name || 'User Name'}
-              </Text>
 
-              <View style={styles.infoLine}>
-                <Text style={styles.infoLabel}>Location:</Text>
-                <Text style={styles.infoValue} numberOfLines={1}>
-                  {formatLocation()}
+          <TouchableOpacity
+            style={styles.profileSummarySection}
+            onPress={() => router.push('/profile/edit')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.profileInfoTopSection}>
+              <Image
+                source={{
+                  uri: currentUser.profileImageUrl || DEFAULT_PROFILE_IMAGE,
+                }}
+                style={styles.profileImageLeft}
+              />
+              <View style={styles.userInfoRight}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {currentUser.name || 'User Name'}
                 </Text>
-              </View>
 
-              <View style={styles.infoLine}>
-                <Text style={styles.infoLabel}>Rating:</Text>
-                <Text style={styles.infoValue}>
-                  {currentUser.averageRating?.toFixed(1) || '0.0'}
-                </Text>
-              </View>
-              <View style={styles.infoLine}>
-                <Text style={styles.infoLabel}>Reviews:</Text>
-                <Text style={styles.infoValue}>
-                  {currentUser.numberOfRatings || 0}
-                </Text>
-              </View>
+                <View style={styles.infoLine}>
+                  <Text style={styles.infoLabel}>Location:</Text>
+                  <Text style={styles.infoValue} numberOfLines={1}>
+                    {formatLocation()}
+                  </Text>
+                </View>
 
-              <View style={styles.userTypeBadgesContainer}>
-                {getUserRoles(currentUser.userType).map((role, index) => (
-                  <View
-                    key={`${role.name}-${index}`}
-                    style={styles.userTypeBadge}
-                  >
-                    <MaterialIcons
-                      name={role.icon as any}
-                      size={14}
-                      color={MAIN_COLOR}
-                    />
-                    <Text style={styles.userTypeBadgeText}>{role.name}</Text>
-                  </View>
-                ))}
+                <View style={styles.infoLine}>
+                  <Text style={styles.infoLabel}>Rating:</Text>
+                  <Text style={styles.infoValue}>
+                    {currentUser.averageRating?.toFixed(1) || '0.0'}
+                  </Text>
+                </View>
+                <View style={styles.infoLine}>
+                  <Text style={styles.infoLabel}>Reviews:</Text>
+                  <Text style={styles.infoValue}>
+                    {currentUser.numberOfRatings || 0}
+                  </Text>
+                </View>
+
+                <View style={styles.userTypeBadgesContainer}>
+                  {getUserRoles(currentUser.userType).map((role, index) => (
+                    <View
+                      key={`${role.name}-${index}`}
+                      style={styles.userTypeBadge}
+                    >
+                      <MaterialIcons
+                        name={role.icon as any}
+                        size={14}
+                        color={MAIN_COLOR}
+                      />
+                      <Text style={styles.userTypeBadgeText}>{role.name}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
 
-          <Button
-            text="Choose Image"
-            onPress={chooseImage}
-            style={styles.actionButtonPrimary}
-            textStyle={styles.actionButtonPrimaryText}
-          />
-        </View>
 
         <View style={styles.tabsSection}>
           <TouchableOpacity
@@ -839,21 +783,7 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     lineHeight: 22,
   },
-  actionButtonPrimary: {
-    backgroundColor: MAIN_COLOR,
-    borderRadius: BORDER_RADIUS,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    minWidth: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 15,
-  },
-  actionButtonPrimaryText: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 17,
-    color: HEADER_TEXT_COLOR,
-  },
+  
   errorText: {
     fontFamily: 'Archivo-Medium',
     fontSize: 16,
