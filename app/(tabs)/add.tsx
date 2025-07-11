@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/Button';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '@/FirebaseConfig';
 import { EquipmentSchema, ListingSchema } from '@/utils/validators';
@@ -22,6 +22,7 @@ import { set, z } from 'zod';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'react-native';
+import { uploadImage } from '../../utils/storage-utils';
 
 // --- Constants ---
 const BORDER_RADIUS = 8;
@@ -52,6 +53,7 @@ export default function AddListing() {
   const [listingType, setListingType] = useState<ListingType>('rental');
   const [rentalUnit, setRentalUnit] = useState<RentalUnit>('day');
   const [image, setImage] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const [condition, setCondition] = useState<EquipmentCondition | ''>('');
   const [year, setYear] = useState('');
@@ -224,6 +226,19 @@ export default function AddListing() {
         return;
       }
 
+      let uploadedImageUrl = '';
+      if (image) {
+        try {
+          const { url } = await uploadImage(image, 'equipment', currentUserId);
+          uploadedImageUrl = url;
+        } catch (error) {
+          console.error('Error uploading image: ', error);
+          Alert.alert('Upload Error', 'Failed to upload image. Please try again.');
+          setSubmitting(false);
+          return;
+        }
+      }
+
       // --- Prepare Equipment Data ---
       const newEquipmentData: Omit<
         z.infer<typeof EquipmentSchema>,
@@ -234,7 +249,7 @@ export default function AddListing() {
         make: make || '',
         model: model || '',
         yearOfManufacture: yearValue,
-        images: image ? [image] : [],
+        images: uploadedImageUrl ? [uploadedImageUrl] : [],
         ownerId: currentUserId,
         description,
         condition: condition || 'Fair',
@@ -256,6 +271,25 @@ export default function AddListing() {
         parsedEquipmentData,
       );
       const equipmentId = equipmentDocRef.id;
+
+      // Upload image after equipmentId is available
+      if (image) {
+        try {
+          const { url, path } = await uploadImage(image, 'equipment', currentUserId, equipmentId);
+          // Update the equipment document with the image URL
+          await updateDoc(equipmentDocRef, {
+            images: [url],
+            imagePath: path, // Store the path for potential deletion later
+          });
+        } catch (error) {
+          console.error('Error uploading image after equipment creation: ', error);
+          Alert.alert('Upload Error', 'Failed to upload image for the listing. Please try again.');
+          // Optionally, you might want to delete the equipment document if image upload fails
+          // await deleteDoc(equipmentDocRef);
+          setSubmitting(false);
+          return;
+        }
+      }
 
       // --- Prepare Listing Data ---
       const newListingData: Omit<z.infer<typeof ListingSchema>, 'id'> = {
