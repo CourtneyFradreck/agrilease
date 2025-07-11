@@ -53,7 +53,7 @@ export default function EditProfileScreen() {
       setUploading(true);
       try {
         const { url } = await uploadImage(result.assets[0].uri, "profile_images", currentUser.id);
-        await handleSave({ profileImageUrl: url });
+        await updateProfileImage(url);
         Alert.alert('Success', 'Profile image updated successfully!');
       } catch (error) {
         console.error('Error uploading image:', error);
@@ -64,10 +64,22 @@ export default function EditProfileScreen() {
     }
   };
 
-  const handleSave = async (updates: object) => {
+  const updateProfileImage = async (imageUrl: string) => {
+    try {
+      const success = await updateProfile({ profileImageUrl: imageUrl });
+      if (!success) {
+        throw new Error('Failed to update profile image');
+      }
+    } catch (error) {
+      console.error('Error updating profile image:', error);
+      throw error;
+    }
+  };
+
+  const handleSave = async () => {
     setSaving(true);
     try {
-      const success = await updateProfile({ ...updates, name });
+      const success = await updateProfile({ name });
       if (success) {
         Alert.alert('Success', 'Profile updated successfully!');
         router.back();
@@ -120,7 +132,7 @@ export default function EditProfileScreen() {
 
         <Button
           text={saving ? 'Saving...' : 'Save Changes'}
-          onPress={() => handleSave({name})}
+          onPress={handleSave}
           style={styles.saveButton}
           textStyle={styles.saveButtonText}
           disabled={saving || uploading}
