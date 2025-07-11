@@ -32,6 +32,8 @@ import {
 } from '@/utils/validators';
 import { ListingCard } from '@/components/ListingCard';
 
+import { Button } from '@/components/Button';
+
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 import { uploadImage } from '@/utils/storage-utils';
