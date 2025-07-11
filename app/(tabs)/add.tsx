@@ -343,7 +343,6 @@ export default function AddListing() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Listing Purpose</Text>
             <View style={styles.smallOptionContainer}>
-              {' '}
               {/* Use new style for smaller buttons */}
               <TouchableOpacity
                 style={[
