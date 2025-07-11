@@ -18,7 +18,7 @@ import { getAuth } from 'firebase/auth';
 import { db } from '@/FirebaseConfig';
 import { EquipmentSchema, ListingSchema } from '@/utils/validators';
 import { MaterialIcons } from '@expo/vector-icons';
-import { z } from 'zod';
+import { set, z } from 'zod';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'react-native';
@@ -160,6 +160,7 @@ export default function AddListing() {
     setLocationAddress('');
     setListingType('rental');
     setRentalUnit('day');
+    setImage(null);
     setCondition('');
     setYear('');
     setPower('');
@@ -233,7 +234,7 @@ export default function AddListing() {
         make: make || '',
         model: model || '',
         yearOfManufacture: yearValue,
-        images: [],
+        images: image ? [image] : [],
         ownerId: currentUserId,
         description,
         condition: condition || 'Fair',
