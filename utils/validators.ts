@@ -60,6 +60,7 @@ export const EquipmentSchema = z.object({
   images: z
     .array(z.string().url('Invalid image URL.'))
     .min(0, 'At least one image URL is recommended.'),
+  imagePath: z.string().optional(),
   currentLocation: GeoPointSchema,
   lastUpdatedAt: FirestoreTimestampSchema,
   rating: z.number().min(0).max(5).optional(),

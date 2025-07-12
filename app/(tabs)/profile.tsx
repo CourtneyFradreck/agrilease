@@ -14,7 +14,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Button } from '@/components/Button';
+
 import { db } from '@/FirebaseConfig';
 import {
   collection,
@@ -31,7 +31,8 @@ import {
   BookingSchema,
 } from '@/utils/validators';
 import { ListingCard } from '@/components/ListingCard';
-import * from firebase as 'firebase';
+
+import { Button } from '@/components/Button';
 
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
@@ -202,23 +203,6 @@ export default function Profile() {
   }, [fetchMyListings]);
 
   //image upload handling
-
-const [selectedImage, setSelectedImage] = useState<string | null>(null);
- const chooseImage = async () => {
-   const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
- 
-   if (permissionResult.granted === false) {
-     Alert.alert('Permission to access camera roll is required!');
-     return;
-   }
- 
-   let result = await ImagePicker.launchImageLibraryAsync();
- 
-   if (!result.canceled) {
-     setSelectedImage(result.assets[0].uri);
-     await uploadImage(result.assets[0].uri, "profile_images", currentUser?.id || '');
-   }
- };
 
 
 
@@ -450,64 +434,63 @@ const [selectedImage, setSelectedImage] = useState<string | null>(null);
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollViewContentContainer}
       >
-        <View style={styles.profileSummarySection}>
-          <View style={styles.profileInfoTopSection}>
-            <Image
-              source={{
-                uri: currentUser.profileImageUrl || DEFAULT_PROFILE_IMAGE,
-              }}
-              style={styles.profileImageLeft}
-            />
-            <View style={styles.userInfoRight}>
-              <Text style={styles.name} numberOfLines={1}>
-                {currentUser.name || 'User Name'}
-              </Text>
 
-              <View style={styles.infoLine}>
-                <Text style={styles.infoLabel}>Location:</Text>
-                <Text style={styles.infoValue} numberOfLines={1}>
-                  {formatLocation()}
+          <TouchableOpacity
+            style={styles.profileSummarySection}
+            onPress={() => router.push('/profile/edit')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.profileInfoTopSection}>
+              <Image
+                source={{
+                  uri: currentUser.profileImageUrl || DEFAULT_PROFILE_IMAGE,
+                }}
+                style={styles.profileImageLeft}
+              />
+              <View style={styles.userInfoRight}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {currentUser.name || 'User Name'}
                 </Text>
-              </View>
 
-              <View style={styles.infoLine}>
-                <Text style={styles.infoLabel}>Rating:</Text>
-                <Text style={styles.infoValue}>
-                  {currentUser.averageRating?.toFixed(1) || '0.0'}
-                </Text>
-              </View>
-              <View style={styles.infoLine}>
-                <Text style={styles.infoLabel}>Reviews:</Text>
-                <Text style={styles.infoValue}>
-                  {currentUser.numberOfRatings || 0}
-                </Text>
-              </View>
+                <View style={styles.infoLine}>
+                  <Text style={styles.infoLabel}>Location:</Text>
+                  <Text style={styles.infoValue} numberOfLines={1}>
+                    {formatLocation()}
+                  </Text>
+                </View>
 
-              <View style={styles.userTypeBadgesContainer}>
-                {getUserRoles(currentUser.userType).map((role, index) => (
-                  <View
-                    key={`${role.name}-${index}`}
-                    style={styles.userTypeBadge}
-                  >
-                    <MaterialIcons
-                      name={role.icon as any}
-                      size={14}
-                      color={MAIN_COLOR}
-                    />
-                    <Text style={styles.userTypeBadgeText}>{role.name}</Text>
-                  </View>
-                ))}
+                <View style={styles.infoLine}>
+                  <Text style={styles.infoLabel}>Rating:</Text>
+                  <Text style={styles.infoValue}>
+                    {currentUser.averageRating?.toFixed(1) || '0.0'}
+                  </Text>
+                </View>
+                <View style={styles.infoLine}>
+                  <Text style={styles.infoLabel}>Reviews:</Text>
+                  <Text style={styles.infoValue}>
+                    {currentUser.numberOfRatings || 0}
+                  </Text>
+                </View>
+
+                <View style={styles.userTypeBadgesContainer}>
+                  {getUserRoles(currentUser.userType).map((role, index) => (
+                    <View
+                      key={`${role.name}-${index}`}
+                      style={styles.userTypeBadge}
+                    >
+                      <MaterialIcons
+                        name={role.icon as any}
+                        size={14}
+                        color={MAIN_COLOR}
+                      />
+                      <Text style={styles.userTypeBadgeText}>{role.name}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
 
-          <Button
-            text="Choose Image"
-            onPress={chooseImage}
-            style={styles.actionButtonPrimary}
-            textStyle={styles.actionButtonPrimaryText}
-          />
-        </View>
 
         <View style={styles.tabsSection}>
           <TouchableOpacity
@@ -802,21 +785,7 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     lineHeight: 22,
   },
-  actionButtonPrimary: {
-    backgroundColor: MAIN_COLOR,
-    borderRadius: BORDER_RADIUS,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    minWidth: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 15,
-  },
-  actionButtonPrimaryText: {
-    fontFamily: 'Archivo-Bold',
-    fontSize: 17,
-    color: HEADER_TEXT_COLOR,
-  },
+  
   errorText: {
     fontFamily: 'Archivo-Medium',
     fontSize: 16,
