@@ -287,7 +287,10 @@ export default function EquipmentDetails() {
             </Text>
           </View>
 
-          <View style={styles.ownerCard}>
+          <TouchableOpacity
+            onPress={() => router.push({ pathname: "/profile/[id]", params: { id: owner.id } })}
+            style={styles.ownerCard}
+          >
             <View style={styles.ownerInfoContent}>
               <Image
                 source={{ uri: owner.profileImageUrl || defaultOwnerImage }}
@@ -308,8 +311,13 @@ export default function EquipmentDetails() {
                   </Text>
                 </View>
               </View>
+              <MaterialIcons
+                name="chevron-right"
+                size={24}
+                color={TEXT_SECONDARY_GREY}
+              />
             </View>
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.sectionTitleContainer}>
             <Text style={styles.sectionTitle}>Key Specifications</Text>
