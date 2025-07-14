@@ -102,7 +102,12 @@ export default function EditProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={HEADER_TEXT_COLOR} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <Text style={styles.headerDescription}>
+            Update your profile details below.
+          </Text>
+        </View>
         <View style={{ width: 24 }} />
       </View>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -179,10 +184,23 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 5,
   },
+    headerTitleContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+    marginLeft: 10,
+  },
   headerTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 18,
     color: HEADER_TEXT_COLOR,
-    fontSize: 20,
-    fontWeight: 'bold',
+    textAlign: 'left',
+  },
+  headerDescription: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'left',
+    marginTop: 2,
   },
   scrollContainer: {
     padding: 20,
