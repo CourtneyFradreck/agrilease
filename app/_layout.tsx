@@ -91,6 +91,12 @@ export default function RootLayout() {
             headerShown: false,
           }}
         />
+        <Stack.Screen
+          name="profile/edit"
+          options={{
+            headerShown: false,
+          }}
+        />
       </Stack>
       <StatusBar style="dark" />
     </AuthProvider>
