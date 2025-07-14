@@ -31,7 +31,9 @@ const DEFAULT_PROFILE_IMAGE = 'https://www.gravatar.com/avatar/?d=mp';
 export default function EditProfileScreen() {
   const { currentUser, updateProfile } = useAuth();
   const [name, setName] = useState(currentUser?.name || '');
-  // Add other fields like location if they are editable
+  const [address, setAddress] = useState(currentUser?.location.address || '');
+  const [region, setRegion] = useState(currentUser?.location.region || '');
+
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -79,7 +81,7 @@ export default function EditProfileScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const success = await updateProfile({ name });
+      const success = await updateProfile({ name, location: { address, region } });
       if (success) {
         Alert.alert('Success', 'Profile updated successfully!');
         router.back();
@@ -129,6 +131,24 @@ export default function EditProfileScreen() {
         </View>
         
         {/* Add other input fields here */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Address</Text>
+          <TextInput
+            style={styles.input}
+            value={address}
+            onChangeText={setAddress}
+            placeholder="Your Address"
+          />
+        </View>
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Region</Text>
+          <TextInput
+            style={styles.input}
+            value={region}
+            onChangeText={setRegion}
+            placeholder="Your Region"
+          />
+        </View>
 
         <Button
           text={saving ? 'Saving...' : 'Save Changes'}
