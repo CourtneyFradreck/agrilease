@@ -53,7 +53,6 @@ export default function AddListing() {
   const [listingType, setListingType] = useState<ListingType>('rental');
   const [rentalUnit, setRentalUnit] = useState<RentalUnit>('day');
   const [image, setImage] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const [condition, setCondition] = useState<EquipmentCondition | ''>('');
   const [year, setYear] = useState('');
