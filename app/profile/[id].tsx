@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   FlatList,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -215,7 +216,12 @@ export default function OwnerProfile() {
             color={HEADER_TEXT_COLOR}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Owner Profile</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Owner Profile</Text>
+          <Text style={styles.headerDescription}>
+            View and interact with {user.name}'s equipment listings.
+          </Text>
+        </View>
         <View style={{ width: 24 }} />
       </SafeAreaView>
 
@@ -274,14 +280,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     backgroundColor: MAIN_COLOR,
+    paddingTop: Platform.OS === 'android' ? 40 : 20,
+    paddingBottom: 15,
+    paddingHorizontal: 15,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+    marginLeft: 10,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: 'Archivo-Bold',
+    fontSize: 18,
     color: HEADER_TEXT_COLOR,
+    textAlign: 'left',
+  },
+  headerDescription: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'left',
+    marginTop: 2,
   },
   backButton: {
     padding: 6,
