@@ -182,20 +182,20 @@ export default function OwnerProfile() {
                   } reviews)`
                 : 'No ratings yet'}
             </Text>
-          </View>
+        </View>
           {user.location && (
             <Text style={styles.locationText}>
-  📍
-  {user.location
-    ? [
-        user.location.address,
-        user.location.region,
-        user.location.country,
-      ]
-        .filter(Boolean)
-        .join(', ')
-    : 'Not set'}
-</Text>
+              📍
+              {user.location
+                ? [
+                    user.location.address,
+                    user.location.region,
+                    user.location.country,
+                  ] 
+                    .filter(Boolean)
+                    .join(', ')
+                    : 'Not set'}
+            </Text>
           )}
         </View>
 
