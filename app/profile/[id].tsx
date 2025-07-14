@@ -3,7 +3,6 @@ import {
   Text,
   StyleSheet,
   Image,
-  ScrollView,
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
@@ -25,7 +24,8 @@ import {
 import { getAuth } from 'firebase/auth';
 import { z } from 'zod';
 import { UserSchema, EquipmentSchema, ListingSchema } from '@/utils/validators';
-import {ListingCard} from '@/components/ListingCard'; // Assuming you have a ListingCard component
+import { ListingCard } from '@/components/ListingCard';
+import Entypo from '@expo/vector-icons/Entypo';
 
 type UserProfile = z.infer<typeof UserSchema>;
 type EquipmentListing = z.infer<typeof ListingSchema> & {
@@ -150,6 +150,58 @@ export default function OwnerProfile() {
     );
   }
 
+  const renderHeader = () => (
+    <>
+      <View style={styles.profileHeader}>
+        <Image
+          source={{ uri: user.profileImageUrl || defaultOwnerImage }}
+          style={styles.profileImage}
+        />
+        <Text style={styles.profileName}>{user.name}</Text>
+        <View style={styles.ratingContainer}>
+          <Text style={styles.ratingText}>
+            {user.averageRating
+              ? `⭐ ${user.averageRating.toFixed(1)} (${
+                  user.numberOfRatings
+                } reviews)`
+              : 'No ratings yet'}
+          </Text>
+        </View>
+        {user.location && (
+          <Text style={styles.locationText}>
+            <Entypo name="location-pin" size={16} color={TEXT_SECONDARY_GREY} />{' '}
+            {user.location
+              ? [
+                  user.location.address,
+                  user.location.region,
+                  user.location.country,
+                ]
+                  .filter(Boolean)
+                  .join(', ')
+              : 'Not set'}
+          </Text>
+        )}
+      </View>
+
+      {currentUserId !== userId && (
+        <View style={styles.actionButtonContainer}>
+          <Button
+            onPress={handleStartConversation}
+            text="Message Owner"
+            style={styles.messageButton}
+            textStyle={styles.messageButtonText}
+          />
+        </View>
+      )}
+
+      <View style={styles.listingsSection}>
+        <Text style={styles.sectionTitle}>
+          Equipment Listed by {user.name}
+        </Text>
+      </View>
+    </>
+  );
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.header}>
@@ -167,73 +219,24 @@ export default function OwnerProfile() {
         <View style={{ width: 24 }} />
       </SafeAreaView>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.profileHeader}>
-          <Image
-            source={{ uri: user.profileImageUrl || defaultOwnerImage }}
-            style={styles.profileImage}
+      <FlatList
+        data={listings}
+        renderItem={({ item }) => (
+          <ListingCard
+            listing={item}
+            onPress={() => router.push(`/listings/${item.id}`)}
           />
-          <Text style={styles.profileName}>{user.name}</Text>
-          <View style={styles.ratingContainer}>
-            <Text style={styles.ratingText}>
-              {user.averageRating
-                ? `⭐ ${user.averageRating.toFixed(1)} (${
-                    user.numberOfRatings
-                  } reviews)`
-                : 'No ratings yet'}
-            </Text>
-        </View>
-          {user.location && (
-            <Text style={styles.locationText}>
-              📍
-              {user.location
-                ? [
-                    user.location.address,
-                    user.location.region,
-                    user.location.country,
-                  ] 
-                    .filter(Boolean)
-                    .join(', ')
-                    : 'Not set'}
-            </Text>
-          )}
-        </View>
-
-        {currentUserId !== userId && (
-          <View style={styles.actionButtonContainer}>
-            <Button
-              onPress={handleStartConversation}
-              text="Message Owner"
-              style={styles.messageButton}
-              textStyle={styles.messageButtonText}
-            />
-          </View>
         )}
-
-        <View style={styles.listingsSection}>
-          <Text style={styles.sectionTitle}>
-            Equipment Listed by {user.name}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listingsGrid}
+        numColumns={2}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={
+          <Text style={styles.noListingsText}>
+            This user has no equipment listed at the moment.
           </Text>
-          {listings.length > 0 ? (
-            <FlatList
-              data={listings}
-              renderItem={({ item }) => (
-                <ListingCard
-                  listing={item}
-                  onPress={() => router.push(`/listings/${item.id}`)}
-                />
-              )}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listingsGrid}
-              numColumns={2}
-            />
-          ) : (
-            <Text style={styles.noListingsText}>
-              This user has no equipment listed at the moment.
-            </Text>
-          )}
-        </View>
-      </ScrollView>
+        }
+      />
     </View>
   );
 }
@@ -282,9 +285,6 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 6,
-  },
-  scrollContent: {
-    paddingBottom: 24,
   },
   profileHeader: {
     alignItems: 'center',
@@ -342,6 +342,7 @@ const styles = StyleSheet.create({
   },
   listingsGrid: {
     justifyContent: 'space-between',
+    paddingHorizontal: 8,
   },
   noListingsText: {
     textAlign: 'center',
