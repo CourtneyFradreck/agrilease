@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 5,
   },
-    headerTitleContainer: {
+  headerTitleContainer: {
     flex: 1,
     alignItems: 'flex-start',
     marginLeft: 10,
