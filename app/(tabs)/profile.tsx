@@ -34,9 +34,6 @@ import { ListingCard } from '@/components/ListingCard';
 
 import { Button } from '@/components/Button';
 
-import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
-import { uploadImage } from '@/utils/storage-utils';
 
 type EquipmentFromDB = z.infer<typeof EquipmentSchema>;
 type ListingFromDB = z.infer<typeof ListingSchema>;
