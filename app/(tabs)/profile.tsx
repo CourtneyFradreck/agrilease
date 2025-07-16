@@ -249,7 +249,7 @@ export default function Profile() {
   const renderRentalItem = ({ item }: { item: HydratedBooking }) => (
     <TouchableOpacity
       style={styles.rentalItemContainer}
-      onPress={() => router.push(`/booking/${item.id}`)}
+      onPress={() => router.push(`/rentals/${item.id}`)}
       activeOpacity={0.7}
     >
       <Image
