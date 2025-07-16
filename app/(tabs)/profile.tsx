@@ -212,7 +212,6 @@ export default function Profile() {
           text="Go to Login"
           onPress={() => router.replace('/login')}
           style={styles.loginButton}
-          textStyle={styles.actionButtonPrimaryText}
         />
       </View>
     );
@@ -296,8 +295,6 @@ export default function Profile() {
           <Button
             text="Retry"
             onPress={fetchMyRentals}
-            style={styles.actionButtonPrimary}
-            textStyle={styles.actionButtonPrimaryText}
           />
         </View>
       );
@@ -318,8 +315,6 @@ export default function Profile() {
           <Button
             text="Browse Equipment"
             onPress={() => router.push('/')}
-            style={styles.actionButtonPrimary}
-            textStyle={styles.actionButtonPrimaryText}
           />
         </View>
       );
@@ -355,8 +350,6 @@ export default function Profile() {
           <Button
             text="Retry"
             onPress={fetchMyListings}
-            style={styles.actionButtonPrimary}
-            textStyle={styles.actionButtonPrimaryText}
           />
         </View>
       );
@@ -379,8 +372,6 @@ export default function Profile() {
             <Button
               text="Add New Listing"
               onPress={() => router.push('/add')}
-              style={styles.actionButtonPrimary}
-              textStyle={styles.actionButtonPrimaryText}
             />
           )}
         </View>
