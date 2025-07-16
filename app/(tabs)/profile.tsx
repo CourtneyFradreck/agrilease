@@ -799,6 +799,7 @@ const styles = StyleSheet.create({
     borderColor: BORDER_GREY,
     marginBottom: 10,
     padding: 12,
+    marginHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     ...Platform.select({
