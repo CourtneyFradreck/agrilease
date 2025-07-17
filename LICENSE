@@ -1,44 +1,40 @@
-# 📜 AgriLease Pre-Release License v1.0
-
+AgriLease Pre-Release License v1.0
 Copyright (c) 2025 Proxyon Technologies
 
----
+====================================
+PERMITTED USES
+====================================
+- You may view, fork, and contribute code to this repository for collaborative development purposes only.
+- You may use the code in private or staging environments for testing and internal development.
+- You may suggest improvements, report bugs, and help build the AgriLease platform under the guidance of the core team.
 
-## ✅ Permitted Uses
+====================================
+PROHIBITED USES
+====================================
+- You may NOT deploy, host, or distribute this project (or any modified version) publicly, especially in Zimbabwe, without explicit written permission from the maintainers.
+- You may NOT commercialize, monetize, or represent this software as your own.
+- Credit alone is NOT enough. Unauthorized distribution or marketing of this app will result in legal action.
+- You may NOT claim ownership of, or use, the AgriLease brand, name, logo, or design assets in any way.
 
-- **View, fork, and contribute** code to this repository for collaborative development purposes only.
-- **Use the code** in private or staging environments for testing and internal development.
-- **Suggest improvements, report bugs, and help build** the AgriLease platform under guidance from the core team.
+====================================
+LEGAL ENFORCEMENT
+====================================
+Any breach of this license will be considered a violation of international copyright law and intellectual property rights.
 
----
-
-## ❌ Prohibited Uses
-
-- **Deploy, host, or distribute** this project (or any modified version) publicly, especially in Zimbabwe, without explicit written permission from the maintainers.
-- **Commercialize, monetize, or represent** this software as your own.
-- **Credit alone is not enough.** Unauthorized distribution or marketing of this app will result in legal action.
-- **Claim ownership or use** the AgriLease brand, name, logo, or design assets in any way.
-
----
-
-## 🚨 Legal Enforcement
-
-Any breach of this license will be considered a violation of international copyright law and intellectual property rights.  
 Unauthorized deployments or distribution, even with attribution, will result in legal consequences — especially if targeted at Zimbabwean markets.
 
-AgriLease is protected under local and international laws.  
+AgriLease is protected under local and international laws.
 We reserve all rights to pursue civil or criminal action against any parties that infringe on these terms.
 
----
+====================================
+OFFICIAL RELEASE CLAUSE
+====================================
+This license remains in effect until AgriLease is officially launched.
+After the official launch, the licensing terms may be updated or replaced.
 
-## 🛡️ Official Release Clause
+====================================
+CONTACT
+====================================
+For permission requests, partnerships, or commercial inquiries, email:
 
-This license remains in effect until AgriLease is officially launched.  
-After launch, the licensing terms may be updated or replaced.
-
----
-
-## 📬 Contact
-
-For permission requests, partnerships, or commercial inquiries, email:  
-**proxyontech@gmail.com**
+proxyontech@gmail.com
