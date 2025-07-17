@@ -1,5 +1,7 @@
 # 🌾 AgriLease
 
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/CourtneyFradreck/agrilease?utm_source=oss&utm_medium=github&utm_campaign=CourtneyFradreck%2Fagrilease&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 **AgriLease** is a mobile-first application that empowers farmers by giving them easy access to lease agricultural machinery nearby. It also serves as a marketplace for renting, buying, or selling equipment within a defined radius. The app is designed to bridge the equipment accessibility gap in rural areas by connecting farmers and equipment owners directly through a simple, intuitive interface.
 
 Built with **React Native**, **TypeScript**, and **Expo**, AgriLease is focused on reliability, scalability, and offline-friendly features suited for agricultural communities.
