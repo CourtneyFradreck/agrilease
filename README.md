@@ -149,7 +149,7 @@ coming soon
 
 ## 📄 License
 
-This project is licensed under the **MIT License**. See `LICENSE` for details.
+⚠️ This project is under a custom pre-release license. Do **not** deploy, distribute, or commercialize without permission. See [LICENSE](./LICENSE) for details.
 
 ## 🔗 Connect with the Developer
 
