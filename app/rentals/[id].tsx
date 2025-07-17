@@ -21,19 +21,21 @@ import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 import { z } from 'zod';
-import { ListingSchema, EquipmentSchema, UserSchema } from '@/utils/validators';
+import {
+  ListingSchema,
+  EquipmentSchema,
+  UserSchema,
+  BookingSchema,
+} from '@/utils/validators';
 
-type DetailedListing = z.infer<typeof ListingSchema> & {
-  equipment: z.infer<typeof EquipmentSchema>;
-  owner: Pick<
-    z.infer<typeof UserSchema>,
-    | 'name'
-    | 'email'
-    | 'profileImageUrl'
-    | 'id'
-    | 'averageRating'
-    | 'numberOfRatings'
-  >;
+type DetailedBooking = z.infer<typeof BookingSchema> & {
+  listing: z.infer<typeof ListingSchema> & {
+    equipment: z.infer<typeof EquipmentSchema>;
+    owner: Pick<
+      z.infer<typeof UserSchema>,
+      'name' | 'email' | 'profileImageUrl' | 'id' | 'averageRating' | 'numberOfRatings'
+    >;
+  };
 };
 
 const BORDER_RADIUS = 8;
@@ -47,12 +49,15 @@ const BORDER_GREY = '#E5E5E5';
 const BACKGROUND_WHITE = '#FFFFFF';
 const BORDER_LIGHT = '#F1F5F9';
 const ERROR_RED = '#DC2626';
+const STATUS_PENDING = '#F59E0B';
+const STATUS_APPROVED = '#10B981';
+const STATUS_DENIED = '#EF4444';
 
-export default function EquipmentDetails() {
-  const { id: listingId } = useLocalSearchParams<{ id: string }>();
+export default function RentalDetails() {
+  const { id: bookingId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [detailedListing, setDetailedListing] =
-    useState<DetailedListing | null>(null);
+  const [detailedBooking, setDetailedBooking] =
+    useState<DetailedBooking | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const auth = getAuth();
@@ -63,9 +68,9 @@ export default function EquipmentDetails() {
     'https://placehold.co/400x250/E5E7EB/4B5563?text=No+Image+Available';
 
   useEffect(() => {
-    const fetchListingDetails = async () => {
-      if (!listingId) {
-        setError('Listing ID is missing.');
+    const fetchBookingDetails = async () => {
+      if (!bookingId) {
+        setError('Booking ID is missing.');
         setLoading(false);
         return;
       }
@@ -73,11 +78,24 @@ export default function EquipmentDetails() {
       setLoading(true);
       setError(null);
       try {
-        const listingDocRef = doc(db, 'listings', listingId);
+        const bookingDocRef = doc(db, 'bookings', bookingId);
+        const bookingSnap = await getDoc(bookingDocRef);
+
+        if (!bookingSnap.exists()) {
+          setError('Booking not found.');
+          setLoading(false);
+          return;
+        }
+        const bookingData = BookingSchema.parse({
+          ...bookingSnap.data(),
+          id: bookingSnap.id,
+        });
+
+        const listingDocRef = doc(db, 'listings', bookingData.listingId);
         const listingSnap = await getDoc(listingDocRef);
 
         if (!listingSnap.exists()) {
-          setError('Listing not found.');
+          setError('Associated listing not found.');
           setLoading(false);
           return;
         }
@@ -102,7 +120,7 @@ export default function EquipmentDetails() {
         const ownerDocRef = doc(db, `users`, listingData.ownerId);
         const ownerSnap = await getDoc(ownerDocRef);
 
-        let ownerData: DetailedListing['owner'] = {
+        let ownerData: DetailedBooking['listing']['owner'] = {
           id: listingData.ownerId,
           name: 'Unknown User',
           email: '',
@@ -126,74 +144,52 @@ export default function EquipmentDetails() {
           console.warn(`Owner with ID ${listingData.ownerId} not found.`);
         }
 
-        setDetailedListing({
-          ...listingData,
-          equipment: equipmentData,
-          owner: ownerData,
+        setDetailedBooking({
+          ...bookingData,
+          listing: {
+            ...listingData,
+            equipment: equipmentData,
+            owner: ownerData,
+          },
         });
       } catch (e) {
-        console.error('Error fetching listing details: ', e);
+        console.error('Error fetching booking details: ', e);
         if (e instanceof z.ZodError) {
           setError(
-            `Data validation error: ${e.errors.map((err) => err.message).join(', ')}`,
+            `Data validation error: ${e.errors.map((err) => err.message).join(', ')}`
           );
         } else {
-          setError('Failed to load listing details. Please try again.');
+          setError('Failed to load booking details. Please try again.');
         }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchListingDetails();
-  }, [listingId]);
+    fetchBookingDetails();
+  }, [bookingId]);
 
   const handleContactOwner = () => {
-    if (!detailedListing?.owner?.id) {
+    if (!detailedBooking?.listing.owner?.id) {
       Alert.alert('Owner not found', 'Could not retrieve owner information.');
       return;
     }
-
-    const isCurrentUserOwner = detailedListing.owner.id === currentUserId;
-
-    if (isCurrentUserOwner) {
-      Alert.alert('Your Listing', 'You are the owner of this listing.');
-      return;
-    }
-
-    router.push(`/messages/${detailedListing.owner.id}`);
-  };
-
-  const handleBookingOrPurchase = () => {
-    if (!detailedListing) return;
-
-    if (detailedListing.listingType === 'rent') {
-      router.push(`/booking/${listingId}`);
-    } else {
-      Alert.alert(
-        'Confirm Purchase',
-        `Are you interested in purchasing "${detailedListing.equipment.name}" for $${detailedListing.price.toFixed(2)}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Yes, I am interested', onPress: () => handleContactOwner() },
-        ],
-      );
-    }
+    router.push(`/messages/${detailedBooking.listing.owner.id}`);
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={MAIN_COLOR} />
-        <Text style={styles.loadingText}>Loading listing details...</Text>
+        <Text style={styles.loadingText}>Loading booking details...</Text>
       </View>
     );
   }
 
-  if (error || !detailedListing) {
+  if (error || !detailedBooking) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error || 'Listing not found.'}</Text>
+        <Text style={styles.errorText}>{error || 'Booking not found.'}</Text>
         <Button
           onPress={() => router.back()}
           text="Go Back"
@@ -203,16 +199,8 @@ export default function EquipmentDetails() {
     );
   }
 
-  const {
-    equipment,
-    owner,
-    listingType,
-    price,
-    rentalUnit,
-    availabilityStartDate,
-    availabilityEndDate,
-    negotiable,
-  } = detailedListing;
+  const { listing, status, totalPrice, startDate, endDate } = detailedBooking;
+  const { equipment, owner } = listing;
   const imageUrl: ImageSourcePropType = {
     uri:
       (equipment.images && equipment.images.length > 0
@@ -230,7 +218,31 @@ export default function EquipmentDetails() {
     });
   };
 
-  const isCurrentUserOwner = detailedListing.owner.id === currentUserId;
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return {
+          backgroundColor: STATUS_APPROVED,
+          color: HEADER_TEXT_COLOR,
+        };
+      case 'pending':
+        return {
+          backgroundColor: STATUS_PENDING,
+          color: TEXT_PRIMARY_DARK,
+        };
+      case 'denied':
+        return {
+          backgroundColor: STATUS_DENIED,
+          color: HEADER_TEXT_COLOR,
+        };
+      default:
+        return {
+          backgroundColor: BORDER_GREY,
+          color: TEXT_PRIMARY_DARK,
+        };
+    }
+  };
+  const statusStyle = getStatusStyle(status);
 
   return (
     <View style={styles.container}>
@@ -247,14 +259,12 @@ export default function EquipmentDetails() {
           />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Listing </Text>
+          <Text style={styles.headerTitle}>Rental Details</Text>
           <Text style={styles.headerDescription}>
-            All the information you need about this equipment
+            Review your rental information and status
           </Text>
         </View>
-        {/* Contact Owner Button in Header - only show if not owner */}
-        {!isCurrentUserOwner && (
-          <TouchableOpacity
+        <TouchableOpacity
             onPress={handleContactOwner}
             style={styles.headerContactButton}
             accessibilityLabel="Contact owner"
@@ -265,9 +275,6 @@ export default function EquipmentDetails() {
               color={HEADER_TEXT_COLOR}
             />
           </TouchableOpacity>
-        )}
-        {/* Spacer if contact button is not rendered to maintain layout */}
-        {isCurrentUserOwner && <View style={{ width: 24 }} />}
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -282,9 +289,6 @@ export default function EquipmentDetails() {
           {/* Owner Info Section */}
           <View style={styles.sectionTitleContainer}>
             <Text style={styles.sectionTitle}>Owner Information</Text>
-            <Text style={styles.ownerSectionSubtitle}>
-              Learn more about the person listing this equipment.
-            </Text>
           </View>
 
           <TouchableOpacity
@@ -361,57 +365,20 @@ export default function EquipmentDetails() {
           <Text style={styles.description}>{equipment.description}</Text>
 
           <View style={styles.sectionTitleContainer}>
-            <Text style={styles.sectionTitle}>Availability & Details</Text>
+            <Text style={styles.sectionTitle}>Booking Details</Text>
           </View>
           <View style={styles.availabilityList}>
-            {/* Table Row: Listing Type */}
             <View style={styles.tableRow}>
-              <Text style={styles.tableLabel}>Listing Type:</Text>
+              <Text style={styles.tableLabel}>Start Date:</Text>
               <Text style={styles.tableValue}>
-                {listingType === 'rent' ? 'For Rent' : 'For Sale'}
+                {formatDate(startDate)}
               </Text>
             </View>
-
-            {/* Table Row: Rental Unit (Conditional for rent listings) */}
-            {listingType === 'rent' && rentalUnit && (
-              <View style={styles.tableRow}>
-                <Text style={styles.tableLabel}>Rental Unit:</Text>
-                <Text style={styles.tableValue}>
-                  Per {rentalUnit.charAt(0).toUpperCase() + rentalUnit.slice(1)}
-                </Text>
-              </View>
-            )}
-
-            {/* Table Row: Availability Dates (Conditional for rent listings) */}
-            {listingType === 'rent' && availabilityStartDate && (
-              <View style={styles.tableRow}>
-                <Text style={styles.tableLabel}>Available From:</Text>
-                <Text style={styles.tableValue}>
-                  {formatDate(availabilityStartDate)}
-                </Text>
-              </View>
-            )}
-            {listingType === 'rent' && availabilityEndDate && (
-              <View style={styles.tableRow}>
-                <Text style={styles.tableLabel}>Available Until:</Text>
-                <Text style={styles.tableValue}>
-                  {formatDate(availabilityEndDate)}
-                </Text>
-              </View>
-            )}
-
-            {/* Table Row: Condition (Conditional for sale listings if not already shown in specs) */}
-            {listingType === 'sell' && equipment.condition && (
-              <View style={styles.tableRow}>
-                <Text style={styles.tableLabel}>Condition:</Text>
-                <Text style={styles.tableValue}>{equipment.condition}</Text>
-              </View>
-            )}
-
-            {/* Table Row: Negotiable */}
             <View style={styles.tableRow}>
-              <Text style={styles.tableLabel}>Negotiable:</Text>
-              <Text style={styles.tableValue}>{negotiable ? 'Yes' : 'No'}</Text>
+              <Text style={styles.tableLabel}>End Date:</Text>
+              <Text style={styles.tableValue}>
+                {formatDate(endDate)}
+              </Text>
             </View>
           </View>
         </View>
@@ -419,23 +386,14 @@ export default function EquipmentDetails() {
 
       <View style={styles.bottomBar}>
         <View style={styles.priceFooter}>
-          <Text style={styles.priceFrom_bottomBar}>
-            {listingType === 'rent' ? 'from' : 'Price'}
-          </Text>
-          <Text style={styles.price_bottomBar}>${price.toFixed(2)}</Text>
-          {listingType === 'rent' && (
-            <Text style={styles.priceUnit_bottomBar}> / {rentalUnit}</Text>
-          )}
+          <Text style={styles.priceFrom_bottomBar}>Total Price</Text>
+          <Text style={styles.price_bottomBar}>${totalPrice.toFixed(2)}</Text>
         </View>
-        {/* Hide Book/Enquire button if current user is the owner */}
-        {!isCurrentUserOwner && (
-          <Button
-            onPress={handleBookingOrPurchase}
-            text={listingType === 'rent' ? 'Book Now' : 'Enquire to Buy'}
-            style={styles.actionButton}
-            textStyle={styles.actionButtonText}
-          />
-        )}
+        <View style={[styles.statusBadge, { backgroundColor: statusStyle.backgroundColor }]}>
+          <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -459,7 +417,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   scrollContent: {
-    paddingBottom: 90, // Ensure space for the fixed bottom bar
+    paddingBottom: 90, 
     flexGrow: 1,
   },
   header: {
@@ -467,7 +425,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 30, // Increased paddingTop for header
+    paddingTop: 30, 
     paddingBottom: 10,
     backgroundColor: MAIN_COLOR,
     position: 'absolute',
@@ -525,7 +483,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     height: 250,
-    marginTop: Platform.OS === 'android' ? 20 + 30 + 10 : 30 + 30 + 10, // Adjusted based on new header height and some buffer
+    marginTop: Platform.OS === 'android' ? 20 + 30 + 10 : 30 + 30 + 10, 
     zIndex: -1,
   },
   image: {
@@ -569,7 +527,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
   },
   ownerImage: {
     width: 48,
@@ -592,40 +549,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
-  starIcon: {
-    color: '#F59E0B',
-    fontSize: 14,
-    marginRight: 2,
-  },
   ratingText: {
     fontFamily: 'Archivo-Regular',
     fontSize: 13,
     color: TEXT_SECONDARY_GREY,
-    textAlign: 'left',
-  },
-  contactOwnerCardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: BACKGROUND_LIGHT_GREY,
-    borderRadius: BORDER_RADIUS,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: BORDER_GREY,
-  },
-  contactOwnerCardButtonText: {
-    fontFamily: 'Archivo-Medium',
-    fontSize: 15,
-    color: MAIN_COLOR,
-  },
-  ownerSectionSubtitle: {
-    fontFamily: 'Archivo-Regular',
-    fontSize: 14,
-    color: TEXT_SECONDARY_GREY,
-    lineHeight: 20,
-    marginBottom: 16,
     textAlign: 'left',
   },
   sectionTitleContainer: {
@@ -677,34 +604,32 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   availabilityList: {
-    marginTop: 0, // Keep this for padding before the table rows
+    marginTop: 0,
     paddingHorizontal: 0,
     marginBottom: 16,
   },
-  // New styles for the mini-table layout
   tableRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between', // Distribute label and value
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8, // Vertical padding for each row
-    borderBottomWidth: 1, // Subtle separator between rows
-    borderBottomColor: BORDER_LIGHT, // Light border
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER_LIGHT,
   },
   tableLabel: {
     fontFamily: 'Archivo-Medium',
     fontSize: 14,
     color: TEXT_SECONDARY_GREY,
-    flex: 1, // Allow label to take space
+    flex: 1,
     textAlign: 'left',
   },
   tableValue: {
     fontFamily: 'Archivo-Regular',
     fontSize: 14,
     color: TEXT_PRIMARY_DARK,
-    flex: 1, // Allow value to take space
-    textAlign: 'right', // Align value to the right
+    flex: 1,
+    textAlign: 'right',
   },
-  // Removed availabilityBullet as it's replaced by tableRow
   bottomBar: {
     position: 'absolute',
     bottom: 0,
@@ -736,35 +661,16 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: HEADER_TEXT_COLOR,
   },
-  priceUnit_bottomBar: {
-    fontFamily: 'Archivo-Regular',
-    fontSize: 13,
-    color: HEADER_TEXT_COLOR,
-    marginLeft: 2,
-  },
-  actionButton: {
-    backgroundColor: CARD_BACKGROUND,
+  statusBadge: {
     borderRadius: BORDER_RADIUS,
     paddingVertical: 12,
     paddingHorizontal: 24,
     minWidth: 120,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: CARD_BACKGROUND,
   },
-  actionButtonText: {
+  statusBadgeText: {
     fontFamily: 'Archivo-Bold',
     fontSize: 16,
-    color: MAIN_COLOR,
-  },
-  ownerListingText: {
-    fontFamily: 'Archivo-Medium',
-    fontSize: 16,
-    color: HEADER_TEXT_COLOR,
-    padding: 10,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: BORDER_RADIUS,
-    textAlign: 'center',
   },
 });
