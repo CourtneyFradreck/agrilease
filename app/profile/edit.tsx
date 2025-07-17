@@ -31,7 +31,9 @@ const DEFAULT_PROFILE_IMAGE = 'https://www.gravatar.com/avatar/?d=mp';
 export default function EditProfileScreen() {
   const { currentUser, updateProfile } = useAuth();
   const [name, setName] = useState(currentUser?.name || '');
-  // Add other fields like location if they are editable
+  const [address, setAddress] = useState(currentUser?.location.address || '');
+  const [region, setRegion] = useState(currentUser?.location.region || '');
+
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -79,7 +81,7 @@ export default function EditProfileScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const success = await updateProfile({ name });
+      const success = await updateProfile({ name, location: { address, region } });
       if (success) {
         Alert.alert('Success', 'Profile updated successfully!');
         router.back();
@@ -100,7 +102,12 @@ export default function EditProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={HEADER_TEXT_COLOR} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <Text style={styles.headerDescription}>
+            Update your profile details below.
+          </Text>
+        </View>
         <View style={{ width: 24 }} />
       </View>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -129,6 +136,24 @@ export default function EditProfileScreen() {
         </View>
         
         {/* Add other input fields here */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Address</Text>
+          <TextInput
+            style={styles.input}
+            value={address}
+            onChangeText={setAddress}
+            placeholder="Your Address"
+          />
+        </View>
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Region</Text>
+          <TextInput
+            style={styles.input}
+            value={region}
+            onChangeText={setRegion}
+            placeholder="Your Region"
+          />
+        </View>
 
         <Button
           text={saving ? 'Saving...' : 'Save Changes'}
@@ -159,10 +184,23 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 5,
   },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+    marginLeft: 10,
+  },
   headerTitle: {
+    fontFamily: 'Archivo-Bold',
+    fontSize: 18,
     color: HEADER_TEXT_COLOR,
-    fontSize: 20,
-    fontWeight: 'bold',
+    textAlign: 'left',
+  },
+  headerDescription: {
+    fontFamily: 'Archivo-Regular',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'left',
+    marginTop: 2,
   },
   scrollContainer: {
     padding: 20,

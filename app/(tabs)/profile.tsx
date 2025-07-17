@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
-  ScrollView,
   Platform,
   SafeAreaView,
   ActivityIndicator,
@@ -33,10 +32,6 @@ import {
 import { ListingCard } from '@/components/ListingCard';
 
 import { Button } from '@/components/Button';
-
-import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
-import { uploadImage } from '@/utils/storage-utils';
 
 type EquipmentFromDB = z.infer<typeof EquipmentSchema>;
 type ListingFromDB = z.infer<typeof ListingSchema>;
@@ -202,10 +197,6 @@ export default function Profile() {
     fetchMyListings();
   }, [fetchMyListings]);
 
-  //image upload handling
-
-
-
   if (!currentUser) {
     return (
       <View style={styles.centeredContainer}>
@@ -215,7 +206,6 @@ export default function Profile() {
           text="Go to Login"
           onPress={() => router.replace('/login')}
           style={styles.loginButton}
-          textStyle={styles.actionButtonPrimaryText}
         />
       </View>
     );
@@ -252,7 +242,7 @@ export default function Profile() {
   const renderRentalItem = ({ item }: { item: HydratedBooking }) => (
     <TouchableOpacity
       style={styles.rentalItemContainer}
-      onPress={() => router.push(`/booking/${item.id}`)}
+      onPress={() => router.push(`/rentals/${item.id}`)}
       activeOpacity={0.7}
     >
       <Image
@@ -279,134 +269,215 @@ export default function Profile() {
     </TouchableOpacity>
   );
 
-  const renderRentalsTabContent = () => {
-    if (loadingRentals) {
-      return (
-        <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color={MAIN_COLOR} />
-          <Text style={styles.loadingMessage}>
-            Loading your rental history...
+  const renderHeader = () => (
+    <>
+      <TouchableOpacity
+        style={styles.profileSummarySection}
+        onPress={() => router.push('/profile/edit')}
+        activeOpacity={0.7}
+      >
+        <View style={styles.profileInfoTopSection}>
+          <Image
+            source={{
+              uri: currentUser.profileImageUrl || DEFAULT_PROFILE_IMAGE,
+            }}
+            style={styles.profileImageLeft}
+          />
+          <View style={styles.userInfoRight}>
+            <Text style={styles.name} numberOfLines={1}>
+              {currentUser.name || 'User Name'}
+            </Text>
+
+            <View style={styles.infoLine}>
+              <Text style={styles.infoLabel}>Location:</Text>
+              <Text style={styles.infoValue} numberOfLines={1}>
+                {formatLocation()}
+              </Text>
+            </View>
+
+            <View style={styles.infoLine}>
+              <Text style={styles.infoLabel}>Rating:</Text>
+              <Text style={styles.infoValue}>
+                {currentUser.averageRating?.toFixed(1) || '0.0'}
+              </Text>
+            </View>
+            <View style={styles.infoLine}>
+              <Text style={styles.infoLabel}>Reviews:</Text>
+              <Text style={styles.infoValue}>
+                {currentUser.numberOfRatings || 0}
+              </Text>
+            </View>
+
+            <View style={styles.userTypeBadgesContainer}>
+              {getUserRoles(currentUser.userType).map((role, index) => (
+                <View
+                  key={`${role.name}-${index}`}
+                  style={styles.userTypeBadge}
+                >
+                  <MaterialIcons
+                    name={role.icon as any}
+                    size={14}
+                    color={MAIN_COLOR}
+                  />
+                  <Text style={styles.userTypeBadgeText}>{role.name}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      <View style={styles.tabsSection}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'rentals' && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab('rentals')}
+          activeOpacity={0.7}
+        >
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === 'rentals' && styles.tabButtonTextActive,
+            ]}
+          >
+            My Rentals
           </Text>
-        </View>
-      );
-    }
+        </TouchableOpacity>
 
-    if (rentalsError) {
-      return (
-        <View style={styles.errorState}>
-          <MaterialIcons name="error-outline" size={40} color={WARNING_COLOR} />
-          <Text style={styles.errorText}>{rentalsError}</Text>
-          <Button
-            text="Retry"
-            onPress={fetchMyRentals}
-            style={styles.actionButtonPrimary}
-            textStyle={styles.actionButtonPrimaryText}
-          />
-        </View>
-      );
-    }
-
-    if (myRentals.length === 0) {
-      return (
-        <View style={styles.emptyStateContainer}>
-          <MaterialIcons
-            name="access-time"
-            size={40}
-            color={EMPTY_STATE_ICON_COLOR}
-          />
-          <Text style={styles.emptyStateTitle}>No rental history</Text>
-          <Text style={styles.emptyStateText}>
-            You haven't rented any equipment yet. Start exploring!
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'listings' && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab('listings')}
+          activeOpacity={0.7}
+        >
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === 'listings' && styles.tabButtonTextActive,
+            ]}
+          >
+            My Listings
           </Text>
-          <Button
-            text="Browse Equipment"
-            onPress={() => router.push('/')}
-            style={styles.actionButtonPrimary}
-            textStyle={styles.actionButtonPrimaryText}
-          />
-        </View>
-      );
-    }
+        </TouchableOpacity>
+      </View>
+    </>
+  );
 
-    return (
-      <FlatList
-        data={myRentals}
-        renderItem={renderRentalItem}
-        keyExtractor={(item) => item.id!}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={false}
-      />
-    );
-  };
+  const renderContent = () => {
+    if (activeTab === 'rentals') {
+      if (loadingRentals) {
+        return (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={MAIN_COLOR} />
+            <Text style={styles.loadingMessage}>Loading your rental history...</Text>
+          </View>
+        );
+      }
 
-  const renderListingsTabContent = () => {
-    if (loadingListings) {
+      if (rentalsError) {
+        return (
+          <View style={styles.errorState}>
+            <MaterialIcons name="error-outline" size={40} color={WARNING_COLOR} />
+            <Text style={styles.errorText}>{rentalsError}</Text>
+            <Button text="Retry" onPress={fetchMyRentals} />
+          </View>
+        );
+      }
+
       return (
-        <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color={MAIN_COLOR} />
-          <Text style={styles.loadingMessage}>Loading your listings...</Text>
-        </View>
+        <FlatList
+          key="rentals"
+          data={myRentals}
+          renderItem={renderRentalItem}
+          keyExtractor={(item) => item.id!}
+          ListHeaderComponent={renderHeader}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyStateContainer}>
+              <MaterialIcons
+                name="access-time"
+                size={40}
+                color={EMPTY_STATE_ICON_COLOR}
+              />
+              <Text style={styles.emptyStateTitle}>No rental history</Text>
+              <Text style={styles.emptyStateText}>
+                You haven't rented any equipment yet. Start exploring!
+              </Text>
+              <Button
+                text="Browse Equipment"
+                onPress={() => router.push('/')}
+              />
+            </View>
+          )}
+        />
       );
-    }
+    } else {
+      if (loadingListings) {
+        return (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={MAIN_COLOR} />
+            <Text style={styles.loadingMessage}>Loading your listings...</Text>
+          </View>
+        );
+      }
 
-    if (listingsError) {
-      return (
-        <View style={styles.errorState}>
-          <MaterialIcons name="error-outline" size={40} color={WARNING_COLOR} />
-          <Text style={styles.errorText}>{listingsError}</Text>
-          <Button
-            text="Retry"
-            onPress={fetchMyListings}
-            style={styles.actionButtonPrimary}
-            textStyle={styles.actionButtonPrimaryText}
-          />
-        </View>
-      );
-    }
+      if (listingsError) {
+        return (
+          <View style={styles.errorState}>
+            <MaterialIcons name="error-outline" size={40} color={WARNING_COLOR} />
+            <Text style={styles.errorText}>{listingsError}</Text>
+            <Button text="Retry" onPress={fetchMyListings} />
+          </View>
+        );
+      }
 
-    if (myListings.length === 0) {
+      const isOwner = currentUser.userType === 'equipmentOwner' || currentUser.userType === 'both';
+
       return (
-        <View style={styles.emptyStateContainer}>
-          <MaterialIcons
-            name="description"
-            size={40}
-            color={EMPTY_STATE_ICON_COLOR}
-          />
-          <Text style={styles.emptyStateTitle}>No listings yet</Text>
-          <Text style={styles.emptyStateText}>
-            You haven't listed any equipment for rent or sale.
-          </Text>
-          {(currentUser.userType === 'equipmentOwner' ||
-            currentUser.userType === 'both') && (
-            <Button
-              text="Add New Listing"
-              onPress={() => router.push('/add')}
-              style={styles.actionButtonPrimary}
-              textStyle={styles.actionButtonPrimaryText}
+        <FlatList
+          key="listings"
+          data={myListings}
+          renderItem={({ item }) => (
+            <ListingCard
+              listing={item}
+              onPress={() => router.push(`/listings/${item.id}`)}
             />
           )}
-        </View>
+          keyExtractor={(item) => item.id!}
+          numColumns={2}
+          ListHeaderComponent={renderHeader}
+          columnWrapperStyle={styles.listingRow}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyStateContainer}>
+              <MaterialIcons
+                name="description"
+                size={40}
+                color={EMPTY_STATE_ICON_COLOR}
+              />
+              <Text style={styles.emptyStateTitle}>No listings yet</Text>
+              <Text style={styles.emptyStateText}>
+                {isOwner
+                  ? "You haven't listed any equipment for rent or sale."
+                  : "You are not an equipment owner. To add listings, please update your profile."}
+              </Text>
+              {isOwner && (
+                <Button
+                  text="Add New Listing"
+                  onPress={() => router.push('/add')}
+                />
+              )}
+            </View>
+          )}
+        />
       );
     }
-
-    return (
-      <FlatList
-        data={myListings}
-        renderItem={({ item }) => (
-          <ListingCard
-            listing={item}
-            onPress={() => router.push(`/listings/${item.id}`)}
-          />
-        )}
-        keyExtractor={(item) => item.id!}
-        numColumns={2}
-        columnWrapperStyle={styles.listingRow}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={false}
-      />
-    );
   };
 
   return (
@@ -428,114 +499,7 @@ export default function Profile() {
           </TouchableOpacity>
         </SafeAreaView>
       </View>
-
-      <ScrollView
-        style={styles.scrollViewContent}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollViewContentContainer}
-      >
-
-          <TouchableOpacity
-            style={styles.profileSummarySection}
-            onPress={() => router.push('/profile/edit')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.profileInfoTopSection}>
-              <Image
-                source={{
-                  uri: currentUser.profileImageUrl || DEFAULT_PROFILE_IMAGE,
-                }}
-                style={styles.profileImageLeft}
-              />
-              <View style={styles.userInfoRight}>
-                <Text style={styles.name} numberOfLines={1}>
-                  {currentUser.name || 'User Name'}
-                </Text>
-
-                <View style={styles.infoLine}>
-                  <Text style={styles.infoLabel}>Location:</Text>
-                  <Text style={styles.infoValue} numberOfLines={1}>
-                    {formatLocation()}
-                  </Text>
-                </View>
-
-                <View style={styles.infoLine}>
-                  <Text style={styles.infoLabel}>Rating:</Text>
-                  <Text style={styles.infoValue}>
-                    {currentUser.averageRating?.toFixed(1) || '0.0'}
-                  </Text>
-                </View>
-                <View style={styles.infoLine}>
-                  <Text style={styles.infoLabel}>Reviews:</Text>
-                  <Text style={styles.infoValue}>
-                    {currentUser.numberOfRatings || 0}
-                  </Text>
-                </View>
-
-                <View style={styles.userTypeBadgesContainer}>
-                  {getUserRoles(currentUser.userType).map((role, index) => (
-                    <View
-                      key={`${role.name}-${index}`}
-                      style={styles.userTypeBadge}
-                    >
-                      <MaterialIcons
-                        name={role.icon as any}
-                        size={14}
-                        color={MAIN_COLOR}
-                      />
-                      <Text style={styles.userTypeBadgeText}>{role.name}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-
-        <View style={styles.tabsSection}>
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === 'rentals' && styles.activeTabButton,
-            ]}
-            onPress={() => setActiveTab('rentals')}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.tabButtonText,
-                activeTab === 'rentals' && styles.tabButtonTextActive,
-              ]}
-            >
-              My Rentals
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === 'listings' && styles.activeTabButton,
-            ]}
-            onPress={() => setActiveTab('listings')}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.tabButtonText,
-                activeTab === 'listings' && styles.tabButtonTextActive,
-              ]}
-            >
-              My Listings
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.tabContent}>
-          {activeTab === 'rentals'
-            ? renderRentalsTabContent()
-            : renderListingsTabContent()}
-        </View>
-      </ScrollView>
+      {renderContent()}
     </View>
   );
 }
@@ -600,15 +564,6 @@ const styles = StyleSheet.create({
   },
   headerSettingsButton: {
     padding: 8,
-  },
-  scrollViewContent: {
-    flex: 1,
-    paddingTop: Platform.OS === 'android' ? 120 : 130,
-    backgroundColor: CARD_BACKGROUND,
-  },
-  scrollViewContentContainer: {
-    paddingBottom: Platform.OS === 'ios' ? 90 : 85,
-    flexGrow: 1,
   },
   profileSummarySection: {
     marginHorizontal: 18,
@@ -748,7 +703,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 18,
     paddingTop: 15,
-    minHeight: 300,
     backgroundColor: CARD_BACKGROUND,
   },
   placeholderText: {
@@ -764,8 +718,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     backgroundColor: CARD_BACKGROUND,
-    borderRadius: BORDER_RADIUS,
-    borderWidth: 1,
     borderColor: BORDER_GREY,
     marginTop: 15,
     minHeight: 250,
@@ -831,7 +783,9 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   listContent: {
-    paddingVertical: 5,
+    paddingTop: Platform.OS === 'android' ? 120 : 130,
+    paddingBottom: Platform.OS === 'ios' ? 90 : 85,
+    flexGrow: 1,
   },
   listingRow: {
     justifyContent: 'space-between',
@@ -845,6 +799,7 @@ const styles = StyleSheet.create({
     borderColor: BORDER_GREY,
     marginBottom: 10,
     padding: 12,
+    marginHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     ...Platform.select({
