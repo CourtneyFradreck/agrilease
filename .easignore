@@ -1,57 +1,61 @@
 # dependencies
+
 node_modules/
 
 # expo
+
 .expo/
 dist/
 web-build/
 expo-env.d.ts
 
 # native
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
+
+_.orig._
+_.jks
+_.p8
+_.p12
+_.key
+\*.mobileprovision
 
 # metro
-.metro-health-check*
+
+.metro-health-check\*
 
 # debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+
+npm-debug._
+yarn-debug._
+yarn-error.\*
 
 # macos
+
 .DS_Store
-*.pem
+\*.pem
 
 # local env files
-.env*.local
+
+.env\*.local
 
 # typescript
-*.tsbuildinfo
+
+\*.tsbuildinfo
 
 # Android/IntelliJ
+
 android/app/build/
 android/.gradle
 android/local.properties
-android/*.iml
+android/_.iml
 .idea/
 android/.settings/
 android/app/release/
-*.hprof
+_.hprof
 .cxx/
 android/captures/
 android/
 
 # Keystore files
-**/*.keystore
-**/*.jks
 
-# environment files
-.env
-
-# google-services
-google-services.json
+**/\*.keystore
+**/\*.jks
