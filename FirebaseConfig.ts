@@ -5,8 +5,10 @@ import { Auth, getAuth, initializeAuth } from 'firebase/auth';
 import { addDoc, collection, getFirestore } from 'firebase/firestore';
 import { Platform } from 'react-native';
 import { getStorage } from 'firebase/storage';
+
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+
 
 export const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -43,6 +45,7 @@ if (Platform.OS !== 'web') {
 } else {
   analytics = getAnalytics(app);
 }
+
 
 
 export { analytics, auth, db, storage };
