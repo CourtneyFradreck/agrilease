@@ -14,12 +14,53 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '@/context/AuthContext';
 import { Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import { useRouter } from 'expo-router';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true, // For Android
+    shouldShowList: true, // For iOS
+  }),
+});
+
+export default function RootLayout() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // This listener is fired whenever a notification is received while the app is foregrounded
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Notification received while foregrounded:', notification);
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(notificationListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data;
+
+        if (data.chatId) {
+          router.push(`/messages/${data.chatId}`);
+        } else if (data.bookingId) {
+          router.push(`/booking/${data.bookingId}`);
+        }
+      }
+    );
+
+    return () => subscription.remove();
+  }, [router]);
 
 if (Platform.OS !== 'web') {
   SplashScreen.preventAutoHideAsync().catch(() => {});
 }
 
-export default function RootLayout() {
   useFrameworkReady();
 
   const [fontsLoaded, fontError] = useFonts({
@@ -108,3 +149,4 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
