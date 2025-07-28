@@ -5,6 +5,7 @@ import { Auth, getAuth, initializeAuth } from 'firebase/auth';
 import { addDoc, collection, getFirestore } from 'firebase/firestore';
 import { Platform } from 'react-native';
 import { getStorage } from 'firebase/storage';
+import { getMessaging } from 'firebase/messaging';
 
 export const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -19,6 +20,7 @@ export const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
+const messaging = getMessaging(app);
 
 let auth: Auth;
 
@@ -57,4 +59,4 @@ export async function testDatabaseConnection() {
   }
 }
 
-export { analytics, auth, db, storage };
+export { app, analytics, auth, db, storage, messaging };

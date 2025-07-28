@@ -12,8 +12,8 @@ import { doc, getDoc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { z } from 'zod';
 import { auth, db } from '../FirebaseConfig';
 import { Timestamp } from 'firebase/firestore';
-import { registerForPushNotificationsAsync } from '@/utils/registerForPushNotificationsAsync';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 type UserDataFromFirestore = z.infer<typeof UserSchema>;
 
@@ -87,15 +87,15 @@ export async function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [isRegistering, setIsRegistering] = useState(false);
+  const { expoPushToken } = usePushNotifications();
 
   const functions = getFunctions();
   const registerPushTokenCloudFunction = httpsCallable(functions, 'registerPushToken');
 
   const handlePushTokenRegistration = async (userId: string) => {
     try {
-      const token = await registerForPushNotificationsAsync();
-      if (token) {
-        await registerPushTokenCloudFunction({ token });
+      if (expoPushToken) {
+        await registerPushTokenCloudFunction({ token: expoPushToken.data });
         console.log('Expo Push Token registered via Cloud Function.');
       }
     } catch (error) {
@@ -163,7 +163,7 @@ export async function AuthProvider({ children }: AuthProviderProps) {
     });
 
     return () => unsubscribe();
-  }, [isRegistering]);
+  }, [isRegistering, expoPushToken]);
 
   const login = async (
     email: string,

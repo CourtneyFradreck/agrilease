@@ -44,7 +44,7 @@ export const registerPushToken = functions.https.onCall(
   }
 );
 
-export const sendNotification = functions.https.onCall(
+export const sendCustomNotification = functions.https.onCall(
   async (data: any, context: any) => {
     const { targetUserId, title, body, data: notificationData = {} } = data;
 
@@ -115,3 +115,47 @@ export const sendNotification = functions.https.onCall(
     }
   }
 );
+
+export const sendChatMessageNotification = functions.firestore
+  .document("messages/{messageId}")
+  .onCreate(async (snapshot, context) => {
+    const message = snapshot.data();
+    const { senderId, recipientId, text, hasNotified } = message;
+
+    if (hasNotified) {
+      return;
+    }
+
+    const recipientDoc = await db.collection("pushTokens").doc(recipientId).get();
+    const pushToken = recipientDoc.data()?.token;
+
+    if (!pushToken) {
+      console.log(`No push token found for user: ${recipientId}`);
+      return;
+    }
+
+    const senderDoc = await db.collection("users").doc(senderId).get();
+    const senderName = senderDoc.data()?.name || "Someone";
+
+    const messages = [{
+      to: pushToken,
+      sound: "default",
+      title: `New message from ${senderName}`,
+      body: text,
+      data: { chatId: context.params.messageId },
+    }];
+
+    const chunks = expo.chunkPushNotifications(messages);
+    const tickets = [];
+
+    for (const chunk of chunks) {
+      try {
+        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+        tickets.push(...ticketChunk);
+      } catch (error) {
+        console.error("Error sending push notification chunk:", error);
+      }
+    }
+
+    await snapshot.ref.update({ hasNotified: true });
+  });
