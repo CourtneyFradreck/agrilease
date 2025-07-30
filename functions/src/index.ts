@@ -1,27 +1,39 @@
-import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
-import { Expo } from "expo-server-sdk";
+import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { logger } from 'firebase-functions'; // V2 logger, replaces console.log
+// The DocumentSnapshot type for event.data in V2 Firestore triggers still comes from V1's firestore module.
+import { DocumentSnapshot } from 'firebase-functions/v1/firestore';
+
+import * as admin from 'firebase-admin'; // Admin SDK is generally V1/V2 compatible
+import { Expo } from 'expo-server-sdk';
+
 
 admin.initializeApp();
 const db = admin.firestore();
 const expo = new Expo();
 
-export const registerPushToken = functions.https.onCall(
-  async (data: any, context: any) => {
-    const { token } = data;
+/**
+ * Registers a user's Expo Push Token in Firestore.
+ * This function should be called from the client app with the user's push token.
+ */
+export const registerPushToken = onCall(
+  async (request: CallableRequest) => { // Type the request object for better safety
+    const { token } = request.data as { token?: string }; // Cast data to expected type
 
     // Check if the user is authenticated
-    if (!context.auth) {
-      throw new functions.https.HttpsError(
+    if (!request.auth) {
+      logger.warn("registerPushToken: Unauthenticated call detected.");
+      throw new HttpsError(
         "unauthenticated",
         "The function must be called while authenticated."
       );
     }
 
-    const userId = context.auth.uid; // Use the authenticated user's UID
+    const userId = request.auth.uid;
 
     if (!token) {
-      throw new functions.https.HttpsError(
+      logger.warn(`registerPushToken: Missing 'token' argument for user ${userId}.`);
+      throw new HttpsError(
         "invalid-argument",
         "The function must be called with a 'token' argument."
       );
@@ -33,10 +45,11 @@ export const registerPushToken = functions.https.onCall(
         token: token,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
+      logger.info('registerPushToken: Push token registered successfully for user:', userId);
       return { success: true };
     } catch (error) {
-      console.error("Error registering push token:", error);
-      throw new functions.https.HttpsError(
+      logger.error("registerPushToken: Error registering push token for user:", userId, error);
+      throw new HttpsError(
         "internal",
         "Unable to register push token."
       );
@@ -44,21 +57,28 @@ export const registerPushToken = functions.https.onCall(
   }
 );
 
-export const sendCustomNotification = functions.https.onCall(
-  async (data: any, context: any) => {
-    const { targetUserId, title, body, data: notificationData = {} } = data;
+/**
+ * Sends a custom push notification to a specific user.
+ * This function can be called by other functions or from an authenticated client (with proper security rules).
+ */
+export const sendCustomNotification = onCall(
+  async (request: CallableRequest) => {
+    const { targetUserId, title, body, data: notificationData = {} } = request.data as {
+      targetUserId?: string;
+      title?: string;
+      body?: string;
+      data?: { [key: string]: any };
+    };
 
     // Optional: Add authentication/authorization checks if only specific users
-    // can send notifications
-    // if (!context.auth) {
-    //   throw new functions.https.HttpsError(
-    //     "unauthenticated",
-    //     "The function must be called while authenticated."
-    //   );
+    // can send notifications (e.g., admin role check)
+    // if (!request.auth || !request.auth.token.admin) {
+    //   throw new HttpsError('permission-denied', 'Only admin users can send custom notifications.');
     // }
 
     if (!targetUserId || !title || !body) {
-      throw new functions.https.HttpsError(
+      logger.warn(`sendCustomNotification: Missing required arguments: targetUserId=${targetUserId}, title=${title}, body=${body}`);
+      throw new HttpsError(
         "invalid-argument",
         "Missing targetUserId, title, or body."
       );
@@ -70,13 +90,13 @@ export const sendCustomNotification = functions.https.onCall(
       const pushToken = doc.data()?.token;
 
       if (!pushToken) {
-        console.log(`No push token found for user: ${targetUserId}`);
+        logger.log(`sendCustomNotification: No push token found for user: ${targetUserId}`);
         return { success: false, message: "No push token found for user." };
       }
 
       // Check that all your push tokens appear to be valid Expo push tokens
       if (!Expo.isExpoPushToken(pushToken)) {
-        console.error(`Push token ${pushToken} is not a valid Expo push token!`);
+        logger.error(`sendCustomNotification: Push token ${pushToken} is not a valid Expo push token for user ${targetUserId}!`);
         return { success: false, message: "Invalid Expo push token." };
       }
 
@@ -90,7 +110,6 @@ export const sendCustomNotification = functions.https.onCall(
       }];
 
       // The Expo push notification service accepts batches of notifications up to 100.
-      // If you're sending more than 100 notifications at once, you need to batch them.
       const chunks = expo.chunkPushNotifications(messages);
       const tickets = [];
 
@@ -99,16 +118,15 @@ export const sendCustomNotification = functions.https.onCall(
           const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
           tickets.push(...ticketChunk);
         } catch (error) {
-          console.error("Error sending push notification chunk:", error);
+          logger.error("sendCustomNotification: Error sending push notification chunk:", error);
         }
       }
 
-      // You can handle the tickets here to check for errors or get receipt IDs
-      // For simplicity, we're just returning success for now.
+      logger.info('sendCustomNotification: Custom notification sent with tickets:', tickets);
       return { success: true, tickets: tickets };
     } catch (error) {
-      console.error("Error sending notification:", error);
-      throw new functions.https.HttpsError(
+      logger.error("sendCustomNotification: Error sending notification:", error);
+      throw new HttpsError(
         "internal",
         "Unable to send notification."
       );
@@ -116,21 +134,63 @@ export const sendCustomNotification = functions.https.onCall(
   }
 );
 
-export const sendChatMessageNotification = functions.firestore
-  .document("messages/{messageId}")
-  .onCreate(async (snapshot, context) => {
+/**
+ * Sends a notification when a new chat message is created in Firestore.
+ * Triggers on: /messages/{messageId} onCreate
+ */
+export const sendChatMessageNotification = onDocumentCreated(
+  "messages/{messageId}", // Path definition for V2 Firestore trigger
+  async (event: { data: DocumentSnapshot | undefined; params: { messageId: string } }) => {
+    // event.data is the DocumentSnapshot of the newly created document
+    // event.params contains the wildcard values from the path (e.g., messageId)
+
+    const snapshot = event.data;
+    const messageId = event.params.messageId;
+
+    if (!snapshot) {
+      logger.warn(`sendChatMessageNotification: No data found for message with ID: ${messageId} during onCreate event.`);
+      return; // Exit if no document data
+    }
+
     const message = snapshot.data();
-    const { senderId, recipientId, text, hasNotified } = message;
+    if (!message) {
+      logger.error("sendChatMessageNotification: Snapshot data is null or undefined for message:", messageId);
+      return; // Exit if snapshot data is empty
+    }
+
+    // Explicitly define an interface for your message for stronger type checking
+    interface ChatMessage {
+        senderId: string;
+        recipientId: string;
+        text: string;
+        hasNotified?: boolean;
+        // Add other properties your message might have
+    }
+
+    // Cast the message data to your interface (optional, but good practice)
+    const chatMessage = message as ChatMessage;
+
+    const senderId = chatMessage.senderId;
+    const recipientId = chatMessage.recipientId;
+    const text = chatMessage.text;
+    const hasNotified = chatMessage.hasNotified;
+
 
     if (hasNotified) {
+      logger.info(`sendChatMessageNotification: Message ${messageId} already processed (hasNotified set).`);
       return;
+    }
+
+    if (!senderId || !recipientId) {
+        logger.error(`sendChatMessageNotification: Missing senderId or recipientId for message ${messageId}.`);
+        return;
     }
 
     const recipientDoc = await db.collection("pushTokens").doc(recipientId).get();
     const pushToken = recipientDoc.data()?.token;
 
     if (!pushToken) {
-      console.log(`No push token found for user: ${recipientId}`);
+      logger.log(`sendChatMessageNotification: No push token found for recipient: ${recipientId}.`);
       return;
     }
 
@@ -142,7 +202,7 @@ export const sendChatMessageNotification = functions.firestore
       sound: "default",
       title: `New message from ${senderName}`,
       body: text,
-      data: { chatId: context.params.messageId },
+      data: { chatId: messageId },
     }];
 
     const chunks = expo.chunkPushNotifications(messages);
@@ -153,9 +213,13 @@ export const sendChatMessageNotification = functions.firestore
         const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
         tickets.push(...ticketChunk);
       } catch (error) {
-        console.error("Error sending push notification chunk:", error);
+        logger.error("sendChatMessageNotification: Error sending push notification chunk:", error);
       }
     }
 
+    // Mark message as notified *after* attempting to send notifications
     await snapshot.ref.update({ hasNotified: true });
-  });
+
+    logger.info(`sendChatMessageNotification: Notification attempt completed for message ${messageId}. Tickets:`, tickets);
+  }
+);
