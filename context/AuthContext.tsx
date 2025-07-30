@@ -82,7 +82,7 @@ const getFirebaseErrorMessage = (error: any): string => {
   }
 };
 
-export async function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children }: AuthProviderProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
