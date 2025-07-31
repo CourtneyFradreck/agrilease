@@ -1,10 +1,9 @@
 import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
-import { logger } from 'firebase-functions'; // V2 logger, replaces console.log
-// The DocumentSnapshot type for event.data in V2 Firestore triggers still comes from V1's firestore module.
+import { logger } from 'firebase-functions';
 import { DocumentSnapshot } from 'firebase-functions/v1/firestore';
 
-import * as admin from 'firebase-admin'; // Admin SDK is generally V1/V2 compatible
+import * as admin from 'firebase-admin';
 import { Expo } from 'expo-server-sdk';
 
 
@@ -161,7 +160,7 @@ export const sendChatMessageNotification = onDocumentCreated(
     // Explicitly define an interface for your message for stronger type checking
     interface ChatMessage {
         senderId: string;
-        recipientId: string;
+        receiverId: string;
         text: string;
         hasNotified?: boolean;
         // Add other properties your message might have
@@ -171,7 +170,7 @@ export const sendChatMessageNotification = onDocumentCreated(
     const chatMessage = message as ChatMessage;
 
     const senderId = chatMessage.senderId;
-    const recipientId = chatMessage.recipientId;
+    const receiverId = chatMessage.receiverId;
     const text = chatMessage.text;
     const hasNotified = chatMessage.hasNotified;
 
@@ -181,16 +180,16 @@ export const sendChatMessageNotification = onDocumentCreated(
       return;
     }
 
-    if (!senderId || !recipientId) {
-        logger.error(`sendChatMessageNotification: Missing senderId or recipientId for message ${messageId}.`);
+    if (!senderId || !receiverId) {
+        logger.error(`sendChatMessageNotification: Missing senderId or receiverId for message ${messageId}.`);
         return;
     }
 
-    const recipientDoc = await db.collection("pushTokens").doc(recipientId).get();
-    const pushToken = recipientDoc.data()?.token;
+    const receiverDoc = await db.collection("pushTokens").doc(receiverId).get();
+    const pushToken = receiverDoc.data()?.token;
 
     if (!pushToken) {
-      logger.log(`sendChatMessageNotification: No push token found for recipient: ${recipientId}.`);
+      logger.log(`sendChatMessageNotification: No push token found for recipient: ${receiverId}.`);
       return;
     }
 

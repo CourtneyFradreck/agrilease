@@ -11,7 +11,7 @@ export const useMessages = (conversationId: string) => {
   const auth = getAuth();
   const currentUserId = auth.currentUser?.uid;
   const functions = getFunctions();
-  const sendNotification = httpsCallable(functions, 'sendNotification');
+  const sendChatMessageNotification = httpsCallable(functions, 'sendChatMessageNotification');
 
   useEffect(() => {
     if (!conversationId) {
@@ -71,8 +71,8 @@ export const useMessages = (conversationId: string) => {
         lastMessageSenderId: currentUserId,
         [`unreadMessages.${receiverId}`]: increment(1),
       });
-      
-      await sendNotification({
+
+      await sendChatMessageNotification({
         targetUserId: receiverId,
         title: 'New Message',
         body: text,
