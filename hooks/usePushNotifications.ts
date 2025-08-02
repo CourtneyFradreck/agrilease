@@ -4,6 +4,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { router } from 'expo-router';
 import { app } from '../FirebaseConfig';
 
 Notifications.setNotificationHandler({
@@ -69,7 +70,10 @@ export const usePushNotifications = (): PushNotificationState => {
       if (token) {
         setExpoPushToken(token);
         try {
-          const registerPushToken = httpsCallable(functions, 'registerPushToken');
+          const registerPushToken = httpsCallable(
+            functions,
+            'registerPushToken'
+          );
           await registerPushToken({ token: token.data });
           console.log('Push token registered successfully!');
         } catch (error) {
@@ -85,7 +89,17 @@ export const usePushNotifications = (): PushNotificationState => {
 
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener((response) => {
-        console.log(response);
+        const {
+          notification: {
+            request: {
+              content: { data },
+            },
+          },
+        } = response;
+
+        if (data.conversationId) {
+          router.push(`/messages/${data.conversationId}`);
+        }
       });
 
     return () => {
