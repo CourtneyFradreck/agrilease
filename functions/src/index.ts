@@ -5,11 +5,13 @@ import { DocumentSnapshot } from 'firebase-functions/v1/firestore';
 
 import * as admin from 'firebase-admin';
 import { Expo } from 'expo-server-sdk';
-
+import { bookingNotifications } from './booking-notifications';
 
 admin.initializeApp();
 const db = admin.firestore();
 const expo = new Expo();
+
+export { bookingNotifications };
 
 /**
  * Registers a user's Expo Push Token in Firestore.

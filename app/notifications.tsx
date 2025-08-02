@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  FlatList,
+  ActivityIndicator,
   TouchableOpacity,
   SafeAreaView,
   Platform,
-  FlatList,
 } from 'react-native';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { db } from '../FirebaseConfig';
+import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
@@ -20,54 +24,35 @@ const BACKGROUND_LIGHT_GREY = '#F9FAFB';
 const CARD_BACKGROUND = '#FFFFFF';
 const BORDER_GREY = '#E5E5E5';
 
-const mockNotifications = [
-  {
-    id: '1',
-    title: 'Booking Confirmed',
-    message: 'Your recent equipment rental has been approved.',
-    timestamp: '2025-06-25T10:00:00Z',
-    read: false,
-  },
-  {
-    id: '2',
-    title: 'New Message',
-    message: 'You have a new message regarding your listing.',
-    timestamp: '2025-06-25T09:30:00Z',
-    read: false,
-  },
-  {
-    id: '3',
-    title: 'Rental Reminder',
-    message: 'Your rental period ends tomorrow. Please prepare for return.',
-    timestamp: '2025-06-24T18:00:00Z',
-    read: false,
-  },
-  {
-    id: '4',
-    title: 'New Review',
-    message: 'A new review has been posted on one of your listings.',
-    timestamp: '2025-06-24T14:15:00Z',
-    read: true,
-  },
-  {
-    id: '5',
-    title: 'Payment Successful',
-    message: 'Your recent payment has been processed.',
-    timestamp: '2025-06-23T11:45:00Z',
-    read: true,
-  },
-  {
-    id: '6',
-    title: 'App Update Available',
-    message: 'A new version of the app is available with new features.',
-    timestamp: '2025-06-22T08:00:00Z',
-    read: true,
-  },
-];
-
 export default function NotificationsScreen() {
-  const handleNotificationPress = (notificationId: string) => {
-    console.log('Notification pressed:', notificationId);
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(firestore, 'notifications'),
+      where('userId', '==', user.uid),
+      orderBy('timestamp', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setNotifications(notifs);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleNotificationPress = (notification) => {
+    if (notification.data?.bookingId) {
+      router.push(`/booking/requests`);
+    } else if (notification.data?.conversationId) {
+      router.push(`/messages/${notification.data.conversationId}`);
+    }
   };
 
   const renderNotificationItem = ({ item }) => (
@@ -76,7 +61,7 @@ export default function NotificationsScreen() {
         styles.notificationItem,
         item.read ? styles.notificationItemRead : {},
       ]}
-      onPress={() => handleNotificationPress(item.id)}
+      onPress={() => handleNotificationPress(item)}
     >
       <View style={styles.notificationContent}>
         <Text
@@ -85,7 +70,10 @@ export default function NotificationsScreen() {
           {item.title}
         </Text>
         <Text
-          style={[styles.notificationMessage, item.read ? styles.textRead : {}]}
+          style={[
+            styles.notificationMessage,
+            item.read ? styles.textRead : {},
+          ]}
           numberOfLines={2}
         >
           {item.message}
@@ -101,6 +89,10 @@ export default function NotificationsScreen() {
       </View>
     </TouchableOpacity>
   );
+
+  if (loading) {
+    return <ActivityIndicator size="large" color="#4D7C0F" />;
+  }
 
   return (
     <View style={styles.container}>
@@ -121,9 +113,9 @@ export default function NotificationsScreen() {
         </SafeAreaView>
       </View>
 
-      {mockNotifications.length > 0 ? (
+      {notifications.length > 0 ? (
         <FlatList
-          data={mockNotifications}
+          data={notifications}
           keyExtractor={(item) => item.id}
           renderItem={renderNotificationItem}
           style={styles.notificationsList}
