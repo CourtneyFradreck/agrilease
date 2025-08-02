@@ -24,7 +24,7 @@ export default function BookingRequestCard({ request }) {
 
   const handleReject = async () => {
     try {
-      await updateDoc(doc(firestore, 'bookings', request.id), {
+      await updateDoc(doc(db, 'bookings', request.id), {
         status: 'rejected',
       });
       Alert.alert('Success', 'Booking request rejected.');
