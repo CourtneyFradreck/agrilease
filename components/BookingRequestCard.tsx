@@ -7,13 +7,13 @@ import {
   Alert,
 } from 'react-native';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../../FirebaseConfig';
+import { db } from '../FirebaseConfig';
 import { router } from 'expo-router';
 
 export default function BookingRequestCard({ request }) {
   const handleAccept = async () => {
     try {
-      await updateDoc(doc(firestore, 'bookings', request.id), {
+      await updateDoc(doc(db, 'bookings', request.id), {
         status: 'accepted',
       });
       Alert.alert('Success', 'Booking request accepted.');
