@@ -17,7 +17,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 export default function RootLayout() {
-  usePushNotifications(); // ✅ Handles notification navigation internally
+  usePushNotifications();
 
   if (Platform.OS !== 'web') {
     SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -53,20 +53,68 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <Stack>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+         name="(auth)"
+         options={{
+          headerShown: false
+         }} />
+        <Stack.Screen
+         name="(tabs)"
+         options={{ headerShown: false
+          }} />
         <Stack.Screen
           name="listings/[id]"
-          options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
+          options={{
+            headerShown: false,
+            presentation: 'modal',
+            animation: 'slide_from_bottom',
+          }}
         />
-        <Stack.Screen name="booking/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="messages/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="profile/settings" options={{ headerShown: false }} />
-        <Stack.Screen name="notifications" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" options={{ headerShown: false }} />
-        <Stack.Screen name="profile/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="profile/edit" options={{ headerShown: false }} />
-        <Stack.Screen name="rentals/[id]" options={{ headerShown: false }} />
+        <Stack.Screen
+         name="booking/[id]"
+          options={{ 
+          headerShown: false
+           }} />
+        <Stack.Screen
+         name="messages/[id]"
+          options={{ 
+          headerShown: false 
+          }} />
+        <Stack.Screen
+         name="profile/settings"
+          options={{
+            headerShown: false
+          }} />
+        <Stack.Screen
+         name="profile/settings"
+         options={{
+            headerShown: false
+          }} />
+        <Stack.Screen
+         name="notifications"
+         options={{
+           headerShown: false
+         }} />
+        <Stack.Screen
+         name="+not-found"
+         options={{
+           headerShown: false
+         }} />
+        <Stack.Screen
+         name="profile/[id]"
+          options={{
+           headerShown: false
+         }} />
+        <Stack.Screen
+         name="profile/edit"
+         options={{
+           headerShown: false
+         }} />
+        <Stack.Screen
+         name="rentals/[id]"
+         options={{
+           headerShown: false
+         }} />
       </Stack>
       <StatusBar style="dark" />
     </AuthProvider>
