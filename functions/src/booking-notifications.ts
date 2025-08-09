@@ -1,69 +1,214 @@
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { logger } from 'firebase-functions/v2'; // Fixed: Use V2 logger for consistency
 import * as admin from 'firebase-admin';
-import { logger } from 'firebase-functions';
 import { Expo } from 'expo-server-sdk';
 
-const db = admin.firestore();
-const expo = new Expo();
+
 
 export const bookingNotifications = onDocumentWritten(
   'bookings/{bookingId}',
   async (event) => {
-    const { change, params } = event.data;
-    const { bookingId } = params;
-
+    // Add this debug log first thing
+    logger.info('🔥 BOOKING NOTIFICATION FUNCTION TRIGGERED!', { 
+      bookingId: event.params.bookingId,
+      hasChange: !!event.data 
+    });
+    
+    const bookingId = event.params.bookingId;
+    const change = event.data; 
+    
     if (!change) {
       logger.warn(`bookingNotifications: No data change for bookingId: ${bookingId}`);
       return;
     }
 
-    // Handle document deletion
-    if (!change.after.exists) {
-      logger.info(`bookingNotifications: Document deleted for bookingId: ${bookingId}, no action taken.`);
-      return;
-    }
+    const { before, after } = change;
 
-    const bookingData = change.after.data();
+    logger.info(`bookingNotifications: Processing event for bookingId: ${bookingId}`);
 
-    // Handle new booking request (creation)
-    if (!change.before.exists) {
-      logger.info(`bookingNotifications: New booking created with id: ${bookingId}`);
-      const ownerId = bookingData.ownerId;
-      const requester = await getUser(bookingData.requesterId);
-
-      if (requester && ownerId) {
-        const message = `${requester.name} has requested to book your ${bookingData.equipmentName}`;
-        await sendNotification(ownerId, 'New Booking Request', message, { bookingId });
-      }
-      return;
-    }
-
-    // Handle booking status update
-    const previousBookingData = change.before.data();
-    if (bookingData.status !== previousBookingData.status) {
-      logger.info(`bookingNotifications: Status changed for bookingId: ${bookingId}`);
-      const requesterId = bookingData.requesterId;
-      let message = '';
-
-      if (bookingData.status === 'accepted') {
-        message = `Your booking for ${bookingData.equipmentName} has been accepted.`;
-      } else if (bookingData.status === 'rejected') {
-        message = `Your booking for ${bookingData.equipmentName} has been rejected.`;
+    try {
+      // Handle document deletion
+      if (!after.exists) {
+        logger.info(`bookingNotifications: Document deleted for bookingId: ${bookingId}, no action taken.`);
+        return;
       }
 
-      if (message) {
-        await sendNotification(requesterId, 'Booking Status Update', message, { bookingId });
+      const bookingData = after.data();
+      
+      if (!bookingData) {
+        logger.error(`bookingNotifications: No booking data found for bookingId: ${bookingId}`);
+        return;
       }
+      
+      // Validate required fields (updated to match your interface)
+      if (!bookingData.ownerId || !bookingData.renterId || !bookingData.equipmentId) {
+        logger.error(`bookingNotifications: Missing required fields for bookingId: ${bookingId}`, {
+          ownerId: !!bookingData.ownerId,
+          renterId: !!bookingData.renterId,
+          equipmentId: !!bookingData.equipmentId
+        });
+        return;
+      }
+
+      // Handle new booking request (creation)
+      if (!before.exists) {
+        await handleNewBookingRequest(bookingId, bookingData, after);
+        return;
+      }
+
+      // Handle booking status update
+      const previousBookingData = before.data();
+      if (bookingData.status !== previousBookingData?.status) {
+        await handleBookingStatusUpdate(bookingId, bookingData, after);
+      }
+
+    } catch (error) {
+      logger.error(`bookingNotifications: Unexpected error processing bookingId ${bookingId}:`, error);
     }
   }
 );
 
+async function handleNewBookingRequest(
+  bookingId: string,
+  bookingData: any,
+  snapshot: admin.firestore.DocumentSnapshot
+) {
+  // Check if already notified to prevent duplicates
+  if (bookingData.hasNotifiedCreation) {
+    logger.info(`bookingNotifications: New booking ${bookingId} already notified.`);
+    return;
+  }
+
+  logger.info(`bookingNotifications: Processing new booking request: ${bookingId}`);
+
+  try {
+    const requester = await getUser(bookingData.renterId); 
+    const equipment = await getEquipment(bookingData.equipmentId); 
+    
+    if (!requester) {
+      logger.error(`bookingNotifications: Could not fetch requester data for userId: ${bookingData.renterId}`);
+      // Mark as notified even if we can't get user data to prevent infinite retries
+      await snapshot.ref.update({ hasNotifiedCreation: true });
+      return;
+    }
+
+    if (!equipment) {
+      logger.error(`bookingNotifications: Could not fetch equipment data for equipmentId: ${bookingData.equipmentId}`);
+      await snapshot.ref.update({ hasNotifiedCreation: true });
+      return;
+    }
+
+    const title = 'New Booking Request';
+    const message = `${requester.name || 'Someone'} has requested to book your ${equipment.name || 'equipment'}`;
+    const notificationData = {
+      bookingId,
+      type: 'booking_request',
+      equipmentId: bookingData.equipmentId,
+      equipmentName: equipment.name || 'equipment',
+      renterId: bookingData.renterId
+    };
+
+    await sendNotification(bookingData.ownerId, title, message, notificationData);
+
+    // Mark as notified to prevent duplicate notifications
+    await snapshot.ref.update({ hasNotifiedCreation: true });
+    
+    logger.info(`bookingNotifications: New booking notification processed for bookingId: ${bookingId}`);
+
+  } catch (error) {
+    logger.error(`bookingNotifications: Error handling new booking request for ${bookingId}:`, error);
+  }
+}
+
+async function handleBookingStatusUpdate(
+  bookingId: string,
+  bookingData: any,
+  snapshot: admin.firestore.DocumentSnapshot
+) {
+  // Check if already notified to prevent duplicates
+  if (bookingData.hasNotifiedStatusChange) {
+    logger.info(`bookingNotifications: Status change for booking ${bookingId} already notified.`);
+    return;
+  }
+
+  logger.info(`bookingNotifications: Processing status change for bookingId: ${bookingId} to ${bookingData.status}`);
+
+  try {
+    const equipment = await getEquipment(bookingData.equipmentId); // Get equipment details
+    let message = '';
+    let notificationType = '';
+
+    const equipmentName = equipment?.name || 'your equipment';
+
+    switch (bookingData.status) {
+      case 'accepted':
+        message = `Your booking for ${equipmentName} has been confirmed.`;
+        notificationType = 'booking_confirmed';
+        break;
+      case 'cancelled':
+        message = `Your booking for ${equipmentName} has been cancelled.`;
+        notificationType = 'booking_cancelled';
+        break;
+      default:
+        logger.info(`bookingNotifications: No notification needed for status: ${bookingData.status}`);
+        await snapshot.ref.update({ hasNotifiedStatusChange: true });
+        return;
+    }
+
+    const notificationData = {
+      bookingId,
+      type: notificationType,
+      status: bookingData.status,
+      equipmentId: bookingData.equipmentId,
+      equipmentName: equipmentName
+    };
+
+    await sendNotification(bookingData.renterId, 'Booking Status Update', message, notificationData); // Changed to renterId
+
+    // Mark as notified to prevent duplicate notifications
+    await snapshot.ref.update({ hasNotifiedStatusChange: true });
+
+    logger.info(`bookingNotifications: Status update notification processed for bookingId: ${bookingId}`);
+
+  } catch (error) {
+    logger.error(`bookingNotifications: Error handling status update for ${bookingId}:`, error);
+  }
+}
+
+async function getEquipment(equipmentId: string) {
+  try {
+    const equipmentDoc = await admin.firestore().collection('equipment').doc(equipmentId).get();
+    
+    if (!equipmentDoc.exists) {
+      logger.warn(`getEquipment: Equipment document not found for equipmentId: ${equipmentId}`);
+      return null;
+    }
+
+    const equipmentData = equipmentDoc.data();
+    logger.info(`getEquipment: Successfully retrieved equipment data for equipmentId: ${equipmentId}`);
+    return equipmentData;
+
+  } catch (error) {
+    logger.error(`getEquipment: Error fetching equipment data for equipmentId: ${equipmentId}`, error);
+    return null;
+  }
+}
+
 async function getUser(userId: string) {
   try {
-    const userDoc = await db.collection('users').doc(userId).get();
-    return userDoc.data();
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      logger.warn(`getUser: User document not found for userId: ${userId}`);
+      return null;
+    }
+
+    const userData = userDoc.data();
+    logger.info(`getUser: Successfully retrieved user data for userId: ${userId}`);
+    return userData;
+
   } catch (error) {
-    logger.error(`Error fetching user data for userId: ${userId}`, error);
+    logger.error(`getUser: Error fetching user data for userId: ${userId}`, error);
     return null;
   }
 }
@@ -75,7 +220,7 @@ async function createNotification(
   data: { [key: string]: string }
 ) {
   try {
-    await db.collection('notifications').add({
+    await admin.firestore().collection('notifications').add({
       userId: recipientId,
       title,
       message: body,
@@ -83,9 +228,11 @@ async function createNotification(
       read: false,
       data,
     });
-    logger.info(`Notification document created for recipient: ${recipientId}`);
+    logger.info(`createNotification: Notification document created for recipient: ${recipientId}`);
+    return true;
   } catch (error) {
-    logger.error(`Error creating notification document for recipient: ${recipientId}`, error);
+    logger.error(`createNotification: Error creating notification document for recipient: ${recipientId}`, error);
+    return false;
   }
 }
 
@@ -95,37 +242,59 @@ async function sendNotification(
   body: string,
   data: { [key: string]: string }
 ) {
-  logger.info(`Attempting to send notification to recipient: ${recipientId}`);
+  logger.info(`sendNotification: Processing notification for recipient: ${recipientId}`);
   
-  // Create notification document in parallel
-  await createNotification(recipientId, title, body, data);
-
-  const tokenDoc = await db.collection('pushTokens').doc(recipientId).get();
-  const pushToken = tokenDoc.data()?.token;
-
-  if (!pushToken) {
-    logger.warn(`No push token found for recipient: ${recipientId}.`);
-    return;
-  }
-
-  if (!Expo.isExpoPushToken(pushToken)) {
-    logger.error(`Push token ${pushToken} is not a valid Expo push token for user ${recipientId}!`);
-    return;
-  }
-
-  const message = {
-    to: pushToken,
-    sound: 'default' as const,
-    title: title,
-    body: body,
-    data: data,
-  };
-
   try {
-    const ticketChunk = await expo.sendPushNotificationsAsync([message]);
-    logger.info('Notification sent successfully', { ticket: ticketChunk[0] });
-    // You can add more logic here to handle ticket receipts, e.g., checking for errors
+    // Create in-app notification document (always do this)
+    const notificationCreated = await createNotification(recipientId, title, body, data);
+    
+    // Get push token for push notification
+    const tokenDoc = await admin.firestore().collection('pushTokens').doc(recipientId).get();
+    const pushToken = tokenDoc.data()?.token;
+
+    if (!pushToken) {
+      logger.warn(`sendNotification: No push token found for recipient: ${recipientId}, in-app notification created: ${notificationCreated}`);
+      return;
+    }
+
+    if (!Expo.isExpoPushToken(pushToken)) {
+      logger.error(`sendNotification: Invalid Expo push token for user ${recipientId}: ${pushToken}`);
+      return;
+    }
+
+    const message = {
+      to: pushToken,
+      sound: 'default' as const,
+      title: title,
+      body: body,
+      data: data,
+    };
+
+    logger.info(`sendNotification: Sending push notification to ${pushToken.substring(0, 20)}...`);
+
+    const expo = new Expo();
+    const chunks = expo.chunkPushNotifications([message]);
+
+    for (const chunk of chunks) {
+      try {
+        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+        logger.info('sendNotification: Push notification sent successfully', { 
+          tickets: ticketChunk,
+          recipientId 
+        });
+
+        // Check for error tickets
+        const errorTickets = ticketChunk.filter(ticket => ticket.status === 'error');
+        if (errorTickets.length > 0) {
+          logger.error('sendNotification: Error tickets found:', errorTickets);
+        }
+
+      } catch (error) {
+        logger.error('sendNotification: Error sending push notification chunk:', error);
+      }
+    }
+
   } catch (error) {
-    logger.error('Error sending push notification:', error);
+    logger.error(`sendNotification: Unexpected error processing notification for ${recipientId}:`, error);
   }
-}''
+}
