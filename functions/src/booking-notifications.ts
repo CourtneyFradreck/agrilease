@@ -68,6 +68,27 @@ async function getUser(userId: string) {
   }
 }
 
+async function createNotification(
+  recipientId: string,
+  title: string,
+  body: string,
+  data: { [key: string]: string }
+) {
+  try {
+    await db.collection('notifications').add({
+      userId: recipientId,
+      title,
+      message: body,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      read: false,
+      data,
+    });
+    logger.info(`Notification document created for recipient: ${recipientId}`);
+  } catch (error) {
+    logger.error(`Error creating notification document for recipient: ${recipientId}`, error);
+  }
+}
+
 async function sendNotification(
   recipientId: string,
   title: string,
@@ -75,6 +96,10 @@ async function sendNotification(
   data: { [key: string]: string }
 ) {
   logger.info(`Attempting to send notification to recipient: ${recipientId}`);
+  
+  // Create notification document in parallel
+  await createNotification(recipientId, title, body, data);
+
   const tokenDoc = await db.collection('pushTokens').doc(recipientId).get();
   const pushToken = tokenDoc.data()?.token;
 
@@ -103,4 +128,4 @@ async function sendNotification(
   } catch (error) {
     logger.error('Error sending push notification:', error);
   }
-}
+}''
