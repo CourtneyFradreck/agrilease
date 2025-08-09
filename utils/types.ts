@@ -56,7 +56,7 @@ export interface Listing {
   views: number;
 }
 
-export interface bookings {
+export interface Bookings {
   id?: string;
   equipmentId: string;
   listingId: string;

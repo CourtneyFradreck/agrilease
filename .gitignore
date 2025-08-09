@@ -56,6 +56,7 @@ android/
 # google-services
 google-services.json
 
-agrilease-37add-firebase-adminsdk-fbsvc-ab0f69d63a.json
+**/*firebase-adminsdk*.json
+serviceAccount*.json
 
 pullrequest.md
