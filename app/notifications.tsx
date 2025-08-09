@@ -30,17 +30,24 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     const q = query(
-      collection(firestore, 'notifications'),
+      collection(db, 'notifications'),
       where('userId', '==', user.uid),
       orderBy('timestamp', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const notifs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      console.log('Fetched notifications:', notifs);
       setNotifications(notifs);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching notifications: ", error);
       setLoading(false);
     });
 
