@@ -13,16 +13,16 @@ import { useAuth } from '../../context/AuthContext';
 import BookingRequestCard from '../../components/BookingRequestCard';
 
 export default function BookingRequestsScreen() {
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
   const [bookingRequests, setBookingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!currentUser) return;
 
     const q = query(
-      collection(firestore, 'bookings'),
-      where('ownerId', '==', user.uid)
+      collection(db, 'bookings'),
+      where('ownerId', '==', currentUser.id)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -32,7 +32,7 @@ export default function BookingRequestsScreen() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [currentUser]);
 
   if (loading) {
     return <ActivityIndicator size="large" color="#4D7C0F" />;

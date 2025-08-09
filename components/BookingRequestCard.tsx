@@ -41,8 +41,8 @@ export default function BookingRequestCard({ request }) {
     <View style={styles.card}>
       <Text style={styles.title}>{request.equipmentName}</Text>
       <Text>Requester: {request.requesterName}</Text>
-      <Text>Start Date: {request.startDate}</Text>
-      <Text>End Date: {request.endDate}</Text>
+      <Text>Start Date: {new Date(request.startDate.seconds * 1000).toLocaleDateString()}</Text>
+      <Text>End Date: {new Date(request.endDate.seconds * 1000).toLocaleDateString()}</Text>
       <View style={styles.actions}>
         <TouchableOpacity style={styles.button} onPress={handleAccept}>
           <Text style={styles.buttonText}>Accept</Text>
