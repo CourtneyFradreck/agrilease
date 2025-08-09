@@ -86,11 +86,6 @@ export default function RootLayout() {
             headerShown: false
           }} />
         <Stack.Screen
-         name="profile/settings"
-         options={{
-            headerShown: false
-          }} />
-        <Stack.Screen
          name="notifications"
          options={{
            headerShown: false
