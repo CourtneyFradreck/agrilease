@@ -28,6 +28,12 @@ jobs:
       - name: Install Expo CLI
         run: npm install -g expo-cli
 
+      - name: Create google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > ./google-services.json
+
+      - name: Create Firebase Admin SDK JSON
+        run: echo "${{ secrets.FIREBASE_ADMIN_SDK_JSON }}" > ./agrilease-37add-firebase-adminsdk-fbsvc-ab0f69d63a.json
+
       - name: Install Expo-managed dependencies
         run: npx expo install
 

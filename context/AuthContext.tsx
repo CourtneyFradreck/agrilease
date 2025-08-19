@@ -8,10 +8,12 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { z } from 'zod';
 import { auth, db } from '../FirebaseConfig';
 import { Timestamp } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 type UserDataFromFirestore = z.infer<typeof UserSchema>;
 
@@ -85,11 +87,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [isRegistering, setIsRegistering] = useState(false);
+  const { expoPushToken } = usePushNotifications();
+
+  const functions = getFunctions();
+  const registerPushTokenCloudFunction = httpsCallable(functions, 'registerPushToken');
+
+  const handlePushTokenRegistration = async (userId: string) => {
+    try {
+      if (expoPushToken) {
+        await registerPushTokenCloudFunction({ token: expoPushToken.data });
+        console.log('Expo Push Token registered via Cloud Function.');
+      }
+    } catch (error) {
+      console.error('Error registering push token via Cloud Function:', error);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // FIX: If a registration is in progress, simply acknowledge the auth state change
-      // but do NOT sign out. Let the 'register' function complete its flow.
       if (isRegistering) {
         console.log(
           'Auth State Changed: Registration is in progress, deferring full state update.',
@@ -117,6 +132,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             console.log(
               'Auth State Changed: User successfully loaded and set.',
             );
+            // Register push token after successful login/auth state change
+            await handlePushTokenRegistration(firebaseUser.uid);
           } else {
             console.warn(
               'Auth State Changed: Firebase user found, but no Firestore document. Signing out.',
@@ -146,7 +163,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
 
     return () => unsubscribe();
-  }, [isRegistering]);
+  }, [isRegistering, expoPushToken]);
 
   const login = async (
     email: string,
@@ -160,6 +177,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         password,
       );
       console.log('Login Success:', userCredential.user.email);
+      // Register push token after successful login
+      await handlePushTokenRegistration(userCredential.user.uid);
       return { success: true };
     } catch (error: any) {
       const errorMessage = getFirebaseErrorMessage(error);
@@ -232,6 +251,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsAuthenticated(true);
       await AsyncStorage.setItem('@user', JSON.stringify(fullUser));
       console.log('Register Success: User account created and data saved.');
+
+      // Register push token after successful registration
+      await handlePushTokenRegistration(firebaseUser.uid);
 
       return { success: true };
     } catch (error: any) {

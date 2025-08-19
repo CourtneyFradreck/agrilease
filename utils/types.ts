@@ -56,6 +56,19 @@ export interface Listing {
   views: number;
 }
 
+export interface Bookings {
+  id?: string;
+  equipmentId: string;
+  listingId: string;
+  ownerId: string;
+  renterId: string;
+  bookingDate: Timestamp | number; 
+  startDate: Timestamp | number; 
+  endDate: Timestamp | number; 
+  status: 'pending' | 'accepted' | 'cancelled';
+  totalPrice: number;
+}
+
 export interface Transaction {
   id?: string;
   listingId: string;

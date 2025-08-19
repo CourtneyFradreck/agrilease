@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "AgriLease",
-    "slug": "AgriLease",
+    "slug": "agrilease",
 
     "version": "1.0.0",
     "orientation": "portrait",
@@ -52,6 +52,7 @@
     "android": {
       "package": "com.courtneycodes.agrileaseapp",
       "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
           "apiKey": "YOUR_Maps_API_KEY"

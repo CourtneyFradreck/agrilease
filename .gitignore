@@ -56,3 +56,7 @@ android/
 # google-services
 google-services.json
 
+**/*firebase-adminsdk*.json
+serviceAccount*.json
+
+pullrequest.md

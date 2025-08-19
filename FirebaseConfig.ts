@@ -57,4 +57,4 @@ export async function testDatabaseConnection() {
   }
 }
 
-export { analytics, auth, db, storage };
+export { app, analytics, auth, db, storage };

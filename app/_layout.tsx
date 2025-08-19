@@ -1,25 +1,28 @@
-import React, { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { Platform } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-
+import { useFonts } from 'expo-font';
 import {
-  useFonts,
   Archivo_400Regular,
   Archivo_500Medium,
   Archivo_600SemiBold,
   Archivo_700Bold,
 } from '@expo-google-fonts/archivo';
-
-import * as SplashScreen from 'expo-splash-screen';
+import { Stack } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { AuthProvider } from '@/context/AuthContext';
-import { Platform } from 'react-native';
-
-if (Platform.OS !== 'web') {
-  SplashScreen.preventAutoHideAsync().catch(() => {});
-}
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 export default function RootLayout() {
+  usePushNotifications();
+
+  if (Platform.OS !== 'web') {
+    SplashScreen.preventAutoHideAsync().catch(() => {});
+  }
+
   useFrameworkReady();
 
   const [fontsLoaded, fontError] = useFonts({
@@ -50,8 +53,15 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <Stack>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+         name="(auth)"
+         options={{
+          headerShown: false
+         }} />
+        <Stack.Screen
+         name="(tabs)"
+         options={{ headerShown: false
+          }} />
         <Stack.Screen
           name="listings/[id]"
           options={{
@@ -61,48 +71,50 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
-          name="booking/[id]"
-          options={{
-            headerShown: false,
-          }}
-        />
+         name="booking/[id]"
+          options={{ 
+          headerShown: false
+           }} />
         <Stack.Screen
-          name="messages/[id]"
-          options={{
-            headerShown: false,
-          }}
-        />
+         name="messages/[id]"
+          options={{ 
+          headerShown: false 
+          }} />
         <Stack.Screen
-          name="profile/settings"
+          name="booking/requests"
           options={{
-            headerShown: false,
-          }}
-        />
+            headerShown: false
+          }} />
         <Stack.Screen
-          name="notifications"
+         name="profile/settings"
           options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen name="+not-found" options={{ headerShown: false }} />
+            headerShown: false
+          }} />
         <Stack.Screen
-          name="profile/[id]"
-          options={{
-            headerShown: false,
-          }}
-        />
+         name="notifications"
+         options={{
+           headerShown: false
+         }} />
         <Stack.Screen
-          name="profile/edit"
-          options={{
-            headerShown: false,
-          }}
-        />
+         name="+not-found"
+         options={{
+           headerShown: false
+         }} />
         <Stack.Screen
-          name="rentals/[id]"
+         name="profile/[id]"
           options={{
-            headerShown: false,
-          }}
-        />
+           headerShown: false
+         }} />
+        <Stack.Screen
+         name="profile/edit"
+         options={{
+           headerShown: false
+         }} />
+        <Stack.Screen
+         name="rentals/[id]"
+         options={{
+           headerShown: false
+         }} />
       </Stack>
       <StatusBar style="dark" />
     </AuthProvider>

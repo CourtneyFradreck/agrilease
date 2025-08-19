@@ -3,12 +3,15 @@ import { db } from '@/FirebaseConfig';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, orderBy, doc, updateDoc, increment } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { Message, Conversation } from '@/utils/types';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 export const useMessages = (conversationId: string) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const auth = getAuth();
   const currentUserId = auth.currentUser?.uid;
+  const functions = getFunctions();
+  const sendChatMessageNotification = httpsCallable(functions, 'sendChatMessageNotification');
 
   useEffect(() => {
     if (!conversationId) {
@@ -68,6 +71,14 @@ export const useMessages = (conversationId: string) => {
         lastMessageSenderId: currentUserId,
         [`unreadMessages.${receiverId}`]: increment(1),
       });
+
+      await sendChatMessageNotification({
+        targetUserId: receiverId,
+        title: 'New Message',
+        body: text,
+        data: { conversationId: convId },
+      });
+
     } catch (error) {
       console.error('Error sending message: ', error);
     }
