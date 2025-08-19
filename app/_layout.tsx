@@ -81,6 +81,11 @@ export default function RootLayout() {
           headerShown: false 
           }} />
         <Stack.Screen
+          name="booking/requests"
+          options={{
+            headerShown: false
+          }} />
+        <Stack.Screen
          name="profile/settings"
           options={{
             headerShown: false
